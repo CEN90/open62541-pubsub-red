@@ -10,10 +10,10 @@ else()
 endif()
 
 if(ZEPHYR_BASE)
-  if(NOT CONFIG_OPEN62541)
-    return()
-  endif()
-  include(arch/zephyr/zephyr.cmake)
+    if(NOT CONFIG_OPEN62541)
+        return()
+    endif()
+    include(arch/zephyr/zephyr.cmake)
 endif()
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -107,7 +107,7 @@ endif()
 string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER_CASE)
 
 option(UA_ENABLE_AMALGAMATION "Concatenate the library to a single file open62541.h/.c" OFF)
-option(BUILD_SHARED_LIBS "Enable building of shared libraries (dll/so)" OFF)
+option(BUILD_SHARED_LIBS "Enable building of shared libraries (dll/so)" ON)
 set(UA_LOGLEVEL 100 CACHE STRING "Minimal level for logs (in addition to the log plugin settings) (100=TRACE, 200=DEBUG, 300=INFO, 400=WARNING, 500=ERROR, 600=FATAL)")
 option(UA_ENABLE_DIAGNOSTICS "Enable diagnostics information exposed by the server" ON)
 option(UA_ENABLE_METHODCALLS "Enable the Method service set" ON)
@@ -121,6 +121,8 @@ option(UA_ENABLE_XML_ENCODING "Enable XML encoding" ON)
 option(UA_ENABLE_NODESETLOADER "Enable nodesetLoader public API" OFF)
 option(UA_ENABLE_GDS_PUSHMANAGEMENT "Enable GDS pushManagement support" OFF)
 option(UA_ENABLE_DATATYPES_ALL "Generate all datatypes for namespace zero (uses more binary space)" ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 
 if(UA_INFORMATION_MODEL_AUTOLOAD AND NOT UA_BUILD_FUZZING)
     set(UA_ENABLE_NODESET_INJECTOR ON)
@@ -128,8 +130,8 @@ endif()
 
 set(MULTITHREADING_DEFAULT 0)
 if(WIN32 OR UNIX)
-  # Enable multithreading by default on Windows and POSIX-like (Unix) systems
-  set(MULTITHREADING_DEFAULT 100)
+    # Enable multithreading by default on Windows and POSIX-like (Unix) systems
+    set(MULTITHREADING_DEFAULT 100)
 endif()
 set(UA_MULTITHREADING ${MULTITHREADING_DEFAULT} CACHE STRING
     "Multithreading support (<100: No multithreading support, >=100: Thread-safety enabled (internal mutexes)")
@@ -162,11 +164,11 @@ if(UA_ENABLE_DISCOVERY_MULTICAST STREQUAL "OFF" OR ${_tmp} GREATER -1)
     elseif(UA_ENABLE_DISCOVERY_MULTICAST STREQUAL "AVAHI")
         set(UA_ENABLE_DISCOVERY_MULTICAST_AVAHI ON)
     endif()
-# Only for backward compatability
+    # Only for backward compatability
 elseif(UA_ENABLE_DISCOVERY_MULTICAST OR UA_ENABLE_DISCOVERY_MULTICAST STREQUAL "ON")
     message(DEPRECATION "Set UA_ENABLE_DISCOVERY_MULTICAST to the desired mDNS library." )
     if(NOT UA_ENABLE_DISCOVERY_MULTICAST_AVAHI)
-    set(UA_ENABLE_DISCOVERY_MULTICAST_MDNSD ON)
+        set(UA_ENABLE_DISCOVERY_MULTICAST_MDNSD ON)
     endif()
 else()
     message(DEPRECATION "Set UA_ENABLE_DISCOVERY_MULTICAST to the desired mDNS library." )
@@ -201,11 +203,11 @@ if(UA_ENABLE_ENCRYPTION STREQUAL "OFF" OR ${_tmp} GREATER -1)
     elseif(UA_ENABLE_ENCRYPTION STREQUAL "LIBRESSL")
         set(UA_ENABLE_ENCRYPTION_LIBRESSL ON)
     endif()
-# Only for backward compatability
+    # Only for backward compatability
 elseif(UA_ENABLE_ENCRYPTION)
     message(DEPRECATION "Set UA_ENABLE_ENCRYPTION to the desired encryption library." )
     if(NOT UA_ENABLE_ENCRYPTION_OPENSSL)
-    set(UA_ENABLE_ENCRYPTION_MBEDTLS ON)
+        set(UA_ENABLE_ENCRYPTION_MBEDTLS ON)
     endif()
 else()
     message(DEPRECATION "Set UA_ENABLE_ENCRYPTION to the desired encryption library." )
@@ -458,10 +460,10 @@ endif()
 # Building shared libs (dll, so). This option is written into ua_config.h.
 set(UA_DYNAMIC_LINKING OFF)
 if(BUILD_SHARED_LIBS)
-  set(UA_DYNAMIC_LINKING ON)
-  if(UA_ENABLE_DISCOVERY_MULTICAST)
-      set(MDNSD_DYNAMIC_LINKING ON)
-  endif()
+    set(UA_DYNAMIC_LINKING ON)
+    if(UA_ENABLE_DISCOVERY_MULTICAST)
+        set(MDNSD_DYNAMIC_LINKING ON)
+    endif()
 endif()
 
 if(UA_ENABLE_SUBSCRIPTIONS_ALARMS_CONDITIONS)
@@ -714,7 +716,7 @@ if((CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang") AND
         check_add_cc_flag("-fno-unwind-tables")
         check_add_cc_flag("-fno-asynchronous-unwind-tables")
         check_add_cc_flag("-fno-math-errno")
-#        check_add_cc_flag("-fno-ident")
+        #        check_add_cc_flag("-fno-ident")
 
         # remove stack-protector with MinSizeRel
         if(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
@@ -737,18 +739,18 @@ if(APPLE)
 endif()
 
 if(MSVC)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3 /w44996")
-  if(UA_FORCE_WERROR)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX") # Compiler warnings, error on warning
-  endif()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3 /w44996")
+    if(UA_FORCE_WERROR)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX") # Compiler warnings, error on warning
+    endif()
 
-  if(UA_MSVC_FORCE_STATIC_CRT AND NOT BUILD_SHARED_LIBS)
-    set(CompilerFlags CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_C_FLAGS
+    if(UA_MSVC_FORCE_STATIC_CRT AND NOT BUILD_SHARED_LIBS)
+        set(CompilerFlags CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_C_FLAGS
         CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE)
-    foreach(CompilerFlag ${CompilerFlags})
-      string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
-    endforeach()
-  endif()
+        foreach(CompilerFlag ${CompilerFlags})
+            string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
+        endforeach()
+    endif()
 endif()
 
 if(UA_BUILD_FUZZING OR UA_BUILD_OSS_FUZZ)
@@ -1148,7 +1150,7 @@ endif()
 # Generate source files #
 #########################
 
- # List of nodeset-xml files to be considered in the generated information model
+# List of nodeset-xml files to be considered in the generated information model
 set(UA_NS0_NODESETS)
 
 if(UA_NAMESPACE_ZERO STREQUAL "FULL")

@@ -1,6 +1,6 @@
 # Build Stage (1/2)
 FROM debian:trixie AS build
-RUN apt-get update && apt-get install -y git build-essential gcc pkg-config cmake python3 libmbedtls-dev check libsubunit-dev
+RUN apt-get update && apt-get install -y git build-essential gcc pkg-config cmake python3 libmbedtls-dev check libsubunit-dev curl
 COPY . /opt/open62541
 
 # Get all the git tags to make sure we detect the correct version with git describe
@@ -31,18 +31,11 @@ RUN apt-get update && apt-get install -y python3-pip openssl && \
     python3 /opt/open62541/tools/certs/create_self-signed.py /opt/open62541/pki/created
 
 
-# Didn't work, skip for now
-# Generate certificates
-# RUN apt-get update && apt-get install -y python3-dev linux-headers-generic openssl && rm -rf /var/cache/apt/archives/* && \
-#     pip3 install --no-cache-dir netifaces==0.10.9 && \
-#     mkdir -p /opt/open62541/pki/created && \
-#     python3 /opt/open62541/tools/certs/create_self-signed.py /opt/open62541/pki/created
-
-
 # Final Stage (2/2)
 FROM debian:trixie AS server
 
-RUN apt-get update # && apt-get install -y mbedtls
+RUN apt-get update  && apt-get install -y git build-essential gcc pkg-config cmake python3
+
 RUN --mount=src=/,dst=/artifacts,from=build \
     mkdir -p /opt/open62541/pki \
     && mkdir -p /usr/local/lib/cmake/open62541 \

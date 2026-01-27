@@ -96,3 +96,5 @@ nbbuild/
 dist/
 nbdist/
 .nb-gradle/
+__cmake*
+
