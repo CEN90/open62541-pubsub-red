@@ -1,6 +1,6 @@
 # Build Stage (1/2)
 FROM debian:trixie AS build
-RUN apt-get update && apt-get install -y git build-essential gcc pkg-config cmake python3 libmbedtls-dev check libsubunit-dev curl
+RUN apt-get update && apt-get install -y git build-essential gcc pkg-config cmake python3 libmbedtls-dev check libsubunit-dev curl libmbedx509-7
 COPY . /opt/open62541
 
 # Get all the git tags to make sure we detect the correct version with git describe
@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y python3-pip openssl && \
 # Final Stage (2/2)
 FROM debian:trixie AS server
 
-RUN apt-get update  && apt-get install -y git build-essential gcc pkg-config cmake python3
+RUN apt-get update  && apt-get install -y git build-essential gcc pkg-config cmake python3 libmbedx509-7
 
 RUN --mount=src=/,dst=/artifacts,from=build \
     mkdir -p /opt/open62541/pki \
