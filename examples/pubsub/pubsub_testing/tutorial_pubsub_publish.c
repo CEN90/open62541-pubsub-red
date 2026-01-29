@@ -31,6 +31,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static UA_NodeId connectionIdent, publishedDataSetIdent, writerGroupIdent,
     dataSetWriterIdent;
@@ -71,6 +72,84 @@ addPublishedDataSet(UA_Server *server) {
     UA_Server_addPublishedDataSet(server, &publishedDataSetConfig, &publishedDataSetIdent);
 }
 
+static UA_NodeId
+addVariableInt32(UA_Server *server) {
+    /* Define the attribute of the myInteger variable node */
+    UA_VariableAttributes attr = UA_VariableAttributes_default;
+    UA_Int32 myInteger = 42;
+    UA_Variant_setScalar(&attr.value, &myInteger, &UA_TYPES[UA_TYPES_INT32]);
+    attr.description = UA_LOCALIZEDTEXT("en-US","the answer");
+    attr.displayName = UA_LOCALIZEDTEXT("en-US","the answer");
+    attr.dataType = UA_TYPES[UA_TYPES_INT32].typeId;
+    attr.accessLevel = UA_ACCESSLEVELMASK_READ;
+
+    /* Add the variable node to the information model */
+    UA_NodeId myIntegerNodeId = UA_NODEID_STRING(1, "the.int32");
+    UA_QualifiedName myIntegerName = UA_QUALIFIEDNAME(1, "the answer");
+    UA_NodeId parentNodeId = UA_NS0ID(OBJECTSFOLDER);
+    UA_NodeId parentReferenceNodeId = UA_NS0ID(ORGANIZES);
+    UA_StatusCode status = UA_Server_addVariableNode(server, myIntegerNodeId, parentNodeId,
+                              parentReferenceNodeId, myIntegerName,
+                              UA_NS0ID(BASEDATAVARIABLETYPE), attr, NULL, NULL);
+
+    if(status == UA_STATUSCODE_GOOD )
+        printf("Created Node %s and numeric NodeID %u\n", myIntegerNodeId.identifier.string.data, myIntegerNodeId.identifier.numeric);
+
+    return myIntegerNodeId;
+}
+
+static UA_NodeId
+addVariableInt64(UA_Server *server) {
+    /* Define the attribute of the myInteger variable node */
+    UA_VariableAttributes attr = UA_VariableAttributes_default;
+    UA_Int64 myInteger = 1337;
+    UA_Variant_setScalar(&attr.value, &myInteger, &UA_TYPES[UA_TYPES_INT64]);
+    attr.description = UA_LOCALIZEDTEXT("en-US","the answer");
+    attr.displayName = UA_LOCALIZEDTEXT("en-US","the answer");
+    attr.dataType = UA_TYPES[UA_TYPES_INT64].typeId;
+    attr.accessLevel = UA_ACCESSLEVELMASK_READ;
+
+    /* Add the variable node to the information model */
+    UA_NodeId myIntegerNodeId = UA_NODEID_STRING(1, "the.int64");
+    UA_QualifiedName myIntegerName = UA_QUALIFIEDNAME(1, "the answer");
+    UA_NodeId parentNodeId = UA_NS0ID(OBJECTSFOLDER);
+    UA_NodeId parentReferenceNodeId = UA_NS0ID(ORGANIZES);
+    UA_StatusCode status = UA_Server_addVariableNode(server, myIntegerNodeId, parentNodeId,
+                              parentReferenceNodeId, myIntegerName,
+                              UA_NS0ID(BASEDATAVARIABLETYPE), attr, NULL, NULL);
+
+    if(status == UA_STATUSCODE_GOOD )
+        printf("Created Node %s and numeric NodeID %u\n", myIntegerNodeId.identifier.string.data, myIntegerNodeId.identifier.numeric);
+
+    return myIntegerNodeId;
+}
+
+static UA_NodeId
+addVariableBoolean(UA_Server *server) {
+    /* Define the attribute of the myInteger variable node */
+    UA_VariableAttributes attr = UA_VariableAttributes_default;
+    UA_Boolean myBoolean = true;
+    UA_Variant_setScalar(&attr.value, &myBoolean, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    attr.description = UA_LOCALIZEDTEXT("en-US","the answer");
+    attr.displayName = UA_LOCALIZEDTEXT("en-US","the answer");
+    attr.dataType = UA_TYPES[UA_TYPES_BOOLEAN].typeId;
+    attr.accessLevel = UA_ACCESSLEVELMASK_READ;
+
+    /* Add the variable node to the information model */
+    UA_NodeId myIntegerNodeId = UA_NODEID_STRING(1, "the.boolean");
+    UA_QualifiedName myIntegerName = UA_QUALIFIEDNAME(1, "the answer");
+    UA_NodeId parentNodeId = UA_NS0ID(OBJECTSFOLDER);
+    UA_NodeId parentReferenceNodeId = UA_NS0ID(ORGANIZES);
+    UA_StatusCode status = UA_Server_addVariableNode(server, myIntegerNodeId, parentNodeId,
+                              parentReferenceNodeId, myIntegerName,
+                              UA_NS0ID(BASEDATAVARIABLETYPE), attr, NULL, NULL);
+
+    if(status == UA_STATUSCODE_GOOD )
+        printf("Created Node %s and numeric NodeID %u\n", myIntegerNodeId.identifier.string.data, myIntegerNodeId.identifier.numeric);
+
+    return myIntegerNodeId;
+}
+
 /**
  * **DataSetField handling**
  *
@@ -81,15 +160,51 @@ addDataSetField(UA_Server *server) {
     /* Add a field to the previous created PublishedDataSet */
     UA_NodeId dataSetFieldIdent;
     UA_DataSetFieldConfig dataSetFieldConfig;
+
+    // First datafield
     memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
     dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
-    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("Server localtime");
+    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("DateTime");
     dataSetFieldConfig.field.variable.promotedField = false;
     dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
         UA_NS0ID(SERVER_SERVERSTATUS_CURRENTTIME);
     dataSetFieldConfig.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
     UA_Server_addDataSetField(server, publishedDataSetIdent,
                               &dataSetFieldConfig, &dataSetFieldIdent);
+
+    // Second datafield
+    memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
+    dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
+    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("Int32");
+    dataSetFieldConfig.field.variable.promotedField = false;
+    dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
+        addVariableInt32(server);
+    dataSetFieldConfig.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
+    UA_Server_addDataSetField(server, publishedDataSetIdent,
+                              &dataSetFieldConfig, &dataSetFieldIdent);
+
+    // Third datafield
+    memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
+    dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
+    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("Int64");
+    dataSetFieldConfig.field.variable.promotedField = false;
+    dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
+        addVariableInt64(server);
+    dataSetFieldConfig.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
+    UA_Server_addDataSetField(server, publishedDataSetIdent,
+                              &dataSetFieldConfig, &dataSetFieldIdent);
+
+    // Fourth datafield
+    memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
+    dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
+    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("Float");
+    dataSetFieldConfig.field.variable.promotedField = false;
+    dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
+        addVariableBoolean(server);
+    dataSetFieldConfig.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
+    UA_Server_addDataSetField(server, publishedDataSetIdent,
+                              &dataSetFieldConfig, &dataSetFieldIdent);
+
 }
 
 /**
@@ -143,7 +258,7 @@ addDataSetWriter(UA_Server *server) {
     memset(&dataSetWriterConfig, 0, sizeof(UA_DataSetWriterConfig));
     dataSetWriterConfig.name = UA_STRING("Demo DataSetWriter");
     dataSetWriterConfig.dataSetWriterId = 62541;
-    dataSetWriterConfig.keyFrameCount = 10;
+    dataSetWriterConfig.keyFrameCount = 0;
     UA_Server_addDataSetWriter(server, writerGroupIdent, publishedDataSetIdent,
                                &dataSetWriterConfig, &dataSetWriterIdent);
 }
