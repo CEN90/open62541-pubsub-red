@@ -13,16 +13,28 @@ typedef struct {
     UA_Int32 something;
 } connectionConfig_s;
 
-void
-keep_alive(void);
+const UA_DateTime HEARBEATIMEOUT = 10;
+UA_Boolean *isPrimary;
 
-void
-sync(State_s *state);
+UA_StatusCode
+setupHeartbeat(const char *ipAddress, int port, int *heartbeatSockfd);
 
-void
+UA_StatusCode
+sendHeartbeat(void);
+
+UA_StatusCode
+checkHeartbeat(int sock);
+
+int 
+initHeartbeatListener(int port);
+
+UA_StatusCode
+syncState(State_s *state);
+
+UA_StatusCode
 init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config);
 
-void
+UA_StatusCode
 setupPubSub(void);
 
 #endif
