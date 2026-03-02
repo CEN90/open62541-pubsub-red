@@ -25,8 +25,7 @@ UA_Boolean isPrimary = UA_FALSE;
    Initialize UDP listener
 ----------------------------------------- */
 int
-initHeartbeatListener(int port)
-{
+initHeartbeatListener(int port) {
     int sock;
     struct sockaddr_in addr;
 
@@ -59,7 +58,6 @@ checkHeartbeat(int sock) {
     struct sockaddr_in sender;
     socklen_t senderLen = sizeof(sender);
 
-
     fd_set readfds;
     FD_ZERO(&readfds);
     FD_SET(sock, &readfds);
@@ -70,8 +68,10 @@ checkHeartbeat(int sock) {
 
     int isActive = select(sock + 1, &readfds, NULL, NULL, &timeout);
 
-    if(isActive <= 0)
+    if(isActive <= 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error in select()");
         return UA_STATUSCODE_BAD;
+    }
 
     if(isActive > 0 && FD_ISSET(sock, &readfds)) {
         int bytes = recvfrom(sock, buffer, BUFFER_SIZE - 1, 0, (struct sockaddr *)&sender,
@@ -158,18 +158,17 @@ setupPubSub(void) {
 
 UA_StatusCode
 init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
-    *isPrimary = false;
+    *isPrimary = UA_FALSE;
     return UA_STATUSCODE_GOOD;
 }
 
-
-int main(int argc, char *argv[]){
+int
+main(int argc, char *argv[]) {
     UA_Boolean isPrimary = UA_TRUE;
 
     int sock = 0;
     const int port = 10001;
     const char controllerIP[] = "10.56.127.36";
-
 
     // Init
     if(isPrimary) {
@@ -185,8 +184,8 @@ int main(int argc, char *argv[]){
     }
 
     // Runtime
-    while (1) {
-        if (isPrimary) {
+    while(1) {
+        if(isPrimary) {
             sendHeartbeat();
         } else {
             UA_StatusCode status = checkHeartbeat(sock);
@@ -195,11 +194,13 @@ int main(int argc, char *argv[]){
                 UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");
             } else {
                 isPrimary = UA_TRUE;
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary failed. Taking over.");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                             "Primary failed. Taking over.");
+                setupHeartbeat(controllerIP, port, &heartbeatSockfd);
             }
         }
 
-        sleep(0.1);
+        sleep(1);
     }
 
     close(sock);

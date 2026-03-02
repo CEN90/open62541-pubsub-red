@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project("PubSubRedundancy")
+set(CMAKE_BUILD_TYPE Debug)
 add_executable(pubsub_redundancy pubsub_redundancy.c)
 
 # Linux/Unix configuration using pkg-config

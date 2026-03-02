@@ -84,6 +84,7 @@ debian/*
 .vim/
 # IDE specific settings
 .idea/
+.zed/
 *.iml
 *.iws
 *.ipr
@@ -97,4 +98,3 @@ dist/
 nbdist/
 .nb-gradle/
 __cmake*
-
