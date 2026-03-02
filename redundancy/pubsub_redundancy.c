@@ -25,7 +25,8 @@ UA_Boolean isPrimary = UA_FALSE;
    Initialize UDP listener
 ----------------------------------------- */
 int
-initHeartbeatListener(int port) {
+initHeartbeatListener(int port)
+{
     int sock;
     struct sockaddr_in addr;
 
@@ -136,6 +137,7 @@ sendHeartbeat(void) {
         close(heartbeatSockfd);
         return UA_STATUSCODE_BAD;
     }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Yeeted");
 
     return UA_STATUSCODE_GOOD;
 }
@@ -160,30 +162,47 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
     return UA_STATUSCODE_GOOD;
 }
 
-int
-main(int argc, char *argv[]) {
-    isPrimary = UA_FALSE;
-    int sock = initHeartbeatListener(10001);
-    if(sock < 0) {
-        printf("Failed to init heartbeat listener");
-        return 1;
-    }
 
-    printf("Backup controller running...\n");
+int main(int argc, char *argv[]){
+    UA_Boolean isPrimary = UA_FALSE;
 
-    while(1) {
-        UA_StatusCode status = checkHeartbeat(sock);
+    const int port = 10001;
+    const char controllerIP[] = "10.56.127.36";
 
-        if(status == UA_STATUSCODE_BAD) {
-            printf("Primary failed. Taking over.\n");
-            // Start primary services here
-        } else if(status == UA_STATUSCODE_GOOD) {
-            printf("Primary is alive\n");
+
+    if (isPrimary) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Starting as primary");
+
+        setupHeartbeat(controllerIP, port, &heartbeatSockfd);
+        
+        while(1){
+            sendHeartbeat();
+            sleep(1);
+        }
+    } else {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Starting as backup");
+
+        int sock = initHeartbeatListener(port);
+        if(sock < 0) {
+            printf("Failed to init heartbeat listener");
+            return UA_STATUSCODE_BAD;
         }
 
-        usleep(1000000);  // 100ms control loop
+        while(1) {
+            UA_StatusCode status = checkHeartbeat(sock);
+
+            if(status == UA_STATUSCODE_BAD) {
+                printf("Primary failed. Taking over.\n");
+                // Start primary services here
+            } else if(status == UA_STATUSCODE_GOOD) {
+                printf("Primary is alive\n");
+            }
+
+            usleep(1000000);  // 100ms control loop
+        }
+
+        close(sock);
     }
 
-    close(sock);
     return 0;
 }
