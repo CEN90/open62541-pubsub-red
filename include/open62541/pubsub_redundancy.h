@@ -14,7 +14,7 @@ typedef struct {
 } connectionConfig_s;
 
 const UA_DateTime HEARBEATIMEOUT = 10;
-UA_Boolean *isPrimary;
+UA_Boolean isPrimary;
 
 UA_StatusCode
 setupHeartbeat(const char *ipAddress, int port, int *heartbeatSockfd);
@@ -25,7 +25,7 @@ sendHeartbeat(void);
 UA_StatusCode
 checkHeartbeat(int sock);
 
-int 
+int
 initHeartbeatListener(int port);
 
 UA_StatusCode
