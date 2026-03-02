@@ -19,7 +19,6 @@
 static int heartbeatSockfd;
 static UA_DateTime prevHbTime;
 struct sockaddr_in server_addr;
-UA_Boolean isPrimary = UA_FALSE;
 
 /* -----------------------------------------
    Initialize UDP listener
@@ -44,7 +43,9 @@ initHeartbeatListener(int port) {
         return -1;
     }
 
-    printf("Heartbeat listener initialized on port %d\n", port);
+    // UA_LOG instead
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                "Heartbeat listener initialized on port %d", port);
 
     return sock;
 }
@@ -53,7 +54,7 @@ initHeartbeatListener(int port) {
    Non-blocking heartbeat check
 ----------------------------------------- */
 UA_StatusCode
-checkHeartbeat(int sock) {
+checkHeartbeat(int sock, UA_Boolean *isPrimary) {
     char buffer[BUFFER_SIZE];
     struct sockaddr_in sender;
     socklen_t senderLen = sizeof(sender);
@@ -66,38 +67,33 @@ checkHeartbeat(int sock) {
     timeout.tv_sec = 0;
     timeout.tv_usec = 0;  // non-blocking
 
+    // Read from socket
     int isActive = select(sock + 1, &readfds, NULL, NULL, &timeout);
+    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                 "Heartbeat check select returned %d on sock %d", isActive, sock);
 
+    // Check if message
     if(isActive <= 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error in select()");
         return UA_STATUSCODE_BAD;
     }
 
+    // Check if correct msg
     if(isActive > 0 && FD_ISSET(sock, &readfds)) {
         int bytes = recvfrom(sock, buffer, BUFFER_SIZE - 1, 0, (struct sockaddr *)&sender,
                              &senderLen);
 
-        printf("ALIVE");
-
         if(bytes > 0) {
             char sender_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(sender.sin_addr), sender_ip, INET_ADDRSTRLEN);
-            printf("Received %d bytes from %s:%d: %.*s\n", bytes, sender_ip,
-                   ntohs(sender.sin_port), bytes, buffer);
             prevHbTime = UA_DateTime_nowMonotonic();
-            isPrimary = UA_FALSE;
-            printf("ALIVE");
         }
     }
 
     // Timeout detection
-    if(isPrimary == UA_FALSE) {
-        long long now = UA_DateTime_nowMonotonic();
-
-        if(prevHbTime != 0 && now - prevHbTime > HEARBEATIMEOUT) {
-            isPrimary = UA_TRUE;
-            return UA_STATUSCODE_BAD;  // takeover
-        }
+    long long now = UA_DateTime_nowMonotonic();
+    if(prevHbTime != 0 && now - prevHbTime > HEARBEATIMEOUT) {
+        return UA_STATUSCODE_BAD;
     }
 
     return UA_STATUSCODE_GOOD;  // primary alive
@@ -164,7 +160,7 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
 
 int
 main(int argc, char *argv[]) {
-    UA_Boolean isPrimary = UA_TRUE;
+    UA_Boolean isPrimary = UA_FALSE;
 
     int sock = 0;
     const int port = 10001;
@@ -183,12 +179,14 @@ main(int argc, char *argv[]) {
         }
     }
 
+    sleep(2);  // wait for heartbeat to stabilize
+
     // Runtime
     while(1) {
         if(isPrimary) {
             sendHeartbeat();
         } else {
-            UA_StatusCode status = checkHeartbeat(sock);
+            UA_StatusCode status = checkHeartbeat(sock, &isPrimary);
 
             if(status == UA_STATUSCODE_GOOD) {
                 UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");

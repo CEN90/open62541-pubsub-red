@@ -23,7 +23,7 @@ UA_StatusCode
 sendHeartbeat(void);
 
 UA_StatusCode
-checkHeartbeat(int sock);
+checkHeartbeat(int sock, UA_Boolean *isPrimary);
 
 int
 initHeartbeatListener(int port);
