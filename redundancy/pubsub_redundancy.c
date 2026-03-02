@@ -164,45 +164,45 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
 
 
 int main(int argc, char *argv[]){
-    UA_Boolean isPrimary = UA_FALSE;
+    UA_Boolean isPrimary = UA_TRUE;
 
+    int sock = 0;
     const int port = 10001;
     const char controllerIP[] = "10.56.127.36";
 
 
-    if (isPrimary) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Starting as primary");
-
+    // Init
+    if(isPrimary) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Init primary");
         setupHeartbeat(controllerIP, port, &heartbeatSockfd);
-        
-        while(1){
-            sendHeartbeat();
-            sleep(1);
-        }
     } else {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Starting as backup");
-
-        int sock = initHeartbeatListener(port);
-        if(sock < 0) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Init as backup");
+        sock = initHeartbeatListener(port);
+        if(sock <= 0) {
             printf("Failed to init heartbeat listener");
             return UA_STATUSCODE_BAD;
         }
+    }
 
-        while(1) {
+    // Runtime
+    while (1) {
+        if (isPrimary) {
+            sendHeartbeat();
+        } else {
             UA_StatusCode status = checkHeartbeat(sock);
 
-            if(status == UA_STATUSCODE_BAD) {
-                printf("Primary failed. Taking over.\n");
-                // Start primary services here
-            } else if(status == UA_STATUSCODE_GOOD) {
-                printf("Primary is alive\n");
+            if(status == UA_STATUSCODE_GOOD) {
+                UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");
+            } else {
+                isPrimary = UA_TRUE;
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary failed. Taking over.");
             }
-
-            usleep(1000000);  // 100ms control loop
         }
 
-        close(sock);
+        sleep(0.1);
     }
+
+    close(sock);
 
     return 0;
 }
