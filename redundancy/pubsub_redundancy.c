@@ -1,4 +1,5 @@
 #include "open62541/pubsub_redundancy.h"
+#include "open62541/pubsub_heartbeat.h"
 
 #include <open62541/plugin/log_stdout.h>
 
@@ -6,137 +7,13 @@
 #include "open62541/types.h"
 
 #include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
 #include <unistd.h>  // close()
 
 #include <arpa/inet.h>  // inet_pton()
 #include <sys/socket.h>
 
-#define HEARTBEAT_MSG "HEARTBEAT"
-#define BUFFER_SIZE 1024
+#include <pthread.h>
 
-static int heartbeatSockfd;
-static UA_DateTime prevHbTime;
-struct sockaddr_in server_addr;
-
-/* -----------------------------------------
-   Initialize UDP listener
------------------------------------------ */
-int
-initHeartbeatListener(int port) {
-    int sock;
-    struct sockaddr_in addr;
-
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if(sock < 0)
-        return -1;
-
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(port);
-
-    if(bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        close(sock);
-        printf("Failed to bind socket\n");
-        return -1;
-    }
-
-    // UA_LOG instead
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                "Heartbeat listener initialized on port %d", port);
-
-    return sock;
-}
-
-/* -----------------------------------------
-   Non-blocking heartbeat check
------------------------------------------ */
-UA_StatusCode
-checkHeartbeat(int sock, UA_Boolean *isPrimary) {
-    char buffer[BUFFER_SIZE];
-    struct sockaddr_in sender;
-    socklen_t senderLen = sizeof(sender);
-
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(sock, &readfds);
-
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 0;  // non-blocking
-
-    // Read from socket
-    int isActive = select(sock + 1, &readfds, NULL, NULL, &timeout);
-    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                 "Heartbeat check select returned %d on sock %d", isActive, sock);
-
-    // Check if message
-    if(isActive <= 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error in select()");
-        return UA_STATUSCODE_BAD;
-    }
-
-    // Check if correct msg
-    if(isActive > 0 && FD_ISSET(sock, &readfds)) {
-        int bytes = recvfrom(sock, buffer, BUFFER_SIZE - 1, 0, (struct sockaddr *)&sender,
-                             &senderLen);
-
-        if(bytes > 0) {
-            char sender_ip[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &(sender.sin_addr), sender_ip, INET_ADDRSTRLEN);
-            prevHbTime = UA_DateTime_nowMonotonic();
-        }
-    }
-
-    // Timeout detection
-    long long now = UA_DateTime_nowMonotonic();
-    if(prevHbTime != 0 && now - prevHbTime > HEARBEATIMEOUT) {
-        return UA_STATUSCODE_BAD;
-    }
-
-    return UA_STATUSCODE_GOOD;  // primary alive
-}
-
-UA_StatusCode
-setupHeartbeat(const char *ipAddress, int port, int *heartbeatSockfd) {
-    // Create UDP socket
-    *heartbeatSockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if(*heartbeatSockfd < 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Socket creation failed");
-        return UA_STATUSCODE_BAD;
-    }
-
-    memset(&server_addr, 0, sizeof(server_addr));
-
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-
-    if(inet_pton(AF_INET, ipAddress, &server_addr.sin_addr) <= 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Invalid address");
-        close(*heartbeatSockfd);
-        return UA_STATUSCODE_BAD;
-    }
-
-    return UA_STATUSCODE_GOOD;
-}
-
-UA_StatusCode
-sendHeartbeat(void) {
-    // Send heartbeat message
-    ssize_t sent = sendto(heartbeatSockfd, HEARTBEAT_MSG, strlen(HEARTBEAT_MSG), 0,
-                          (const struct sockaddr *)&server_addr, sizeof(server_addr));
-
-    if(sent < 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Sendto failed");
-        close(heartbeatSockfd);
-        return UA_STATUSCODE_BAD;
-    }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Yeeted");
-
-    return UA_STATUSCODE_GOOD;
-}
 
 UA_StatusCode
 syncState(State_s *state) {
@@ -162,46 +39,24 @@ int
 main(int argc, char *argv[]) {
     UA_Boolean isPrimary = UA_FALSE;
 
-    int sock = 0;
+    int sockfd = 0;
     const int port = 10001;
-    const char controllerIP[] = "10.56.127.36";
+    const char controllerIP[] = "172.17.0.1"; //"10.56.127.36";
 
-    // Init
-    if(isPrimary) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Init primary");
-        setupHeartbeat(controllerIP, port, &heartbeatSockfd);
-    } else {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Init as backup");
-        sock = initHeartbeatListener(port);
-        if(sock <= 0) {
-            printf("Failed to init heartbeat listener");
-            return UA_STATUSCODE_BAD;
-        }
-    }
+    pthread_t heartbeatThread;
+    
+    HeartbeatConfig heartbeatConfig = {
+        .ipAddress = controllerIP,
+        .port = &port,
+        .sockfd = &sockfd,
+        .isPrimary = &isPrimary,
+    };
+    
+    pthread_create(&heartbeatThread, NULL, initHeartBeat, &heartbeatConfig);
+    
+    pthread_join(heartbeatThread, NULL);
 
-    sleep(2);  // wait for heartbeat to stabilize
-
-    // Runtime
-    while(1) {
-        if(isPrimary) {
-            sendHeartbeat();
-        } else {
-            UA_StatusCode status = checkHeartbeat(sock, &isPrimary);
-
-            if(status == UA_STATUSCODE_GOOD) {
-                UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");
-            } else {
-                isPrimary = UA_TRUE;
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                             "Primary failed. Taking over.");
-                setupHeartbeat(controllerIP, port, &heartbeatSockfd);
-            }
-        }
-
-        sleep(1);
-    }
-
-    close(sock);
+    close(sockfd);
 
     return 0;
 }

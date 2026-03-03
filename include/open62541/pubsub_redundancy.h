@@ -13,20 +13,7 @@ typedef struct {
     UA_Int32 something;
 } connectionConfig_s;
 
-const UA_DateTime HEARBEATIMEOUT = 10;
-UA_Boolean isPrimary;
-
-UA_StatusCode
-setupHeartbeat(const char *ipAddress, int port, int *heartbeatSockfd);
-
-UA_StatusCode
-sendHeartbeat(void);
-
-UA_StatusCode
-checkHeartbeat(int sock, UA_Boolean *isPrimary);
-
-int
-initHeartbeatListener(int port);
+extern UA_Boolean isPrimary;
 
 UA_StatusCode
 syncState(State_s *state);
