@@ -29,34 +29,60 @@ setupPubSub(void) {
     return UA_STATUSCODE_GOOD;
 }
 
+void
+testPrimary(UA_Boolean const *isPrimary) {
+    UA_Boolean prevValue = *isPrimary;
+
+    while (1) {
+        if (*isPrimary != prevValue) {
+            UA_LOG_INFO(
+                UA_Log_Stdout,
+                UA_LOGCATEGORY_USERLAND,
+                "Primary status changed to %s", *isPrimary ? "true" : "false"
+            );
+            prevValue = *isPrimary;
+        }
+
+        sleep(1);
+    }
+}
+
 UA_StatusCode
 init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
-    *isPrimary = UA_FALSE;
+    int sockfd = 0;
+
+    pthread_t heartbeatThread;
+
+    HeartbeatConfig heartbeatConfig = {
+        .ipAddress = config->ipAddress,
+        .port = config->port,
+        .sockfd = &sockfd,
+        .isPrimary = isPrimary,
+    };
+
+    pthread_create(&heartbeatThread, NULL, initHeartBeat, &heartbeatConfig);
+
+    testPrimary(isPrimary);
+
+    pthread_join(heartbeatThread, NULL);
+
+    close(sockfd);
     return UA_STATUSCODE_GOOD;
 }
 
 int
 main(int argc, char *argv[]) {
     UA_Boolean isPrimary = UA_FALSE;
-
-    int sockfd = 0;
+    
     const int port = 10001;
     const char controllerIP[] = "172.17.0.1"; //"10.56.127.36";
 
-    pthread_t heartbeatThread;
-    
-    HeartbeatConfig heartbeatConfig = {
-        .ipAddress = controllerIP,
+    connectionConfig_s config = {
         .port = &port,
-        .sockfd = &sockfd,
-        .isPrimary = &isPrimary,
+        .ipAddress = controllerIP,
     };
-    
-    pthread_create(&heartbeatThread, NULL, initHeartBeat, &heartbeatConfig);
-    
-    pthread_join(heartbeatThread, NULL);
 
-    close(sockfd);
+    init(&isPrimary, NULL, &config);
 
     return 0;
 }

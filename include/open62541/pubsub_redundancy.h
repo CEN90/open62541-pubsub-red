@@ -10,7 +10,8 @@ typedef struct {
 } State_s;
 
 typedef struct {
-    UA_Int32 something;
+    const int *port;
+    const char *ipAddress;
 } connectionConfig_s;
 
 extern UA_Boolean isPrimary;
