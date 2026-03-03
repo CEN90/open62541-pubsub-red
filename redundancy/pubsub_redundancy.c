@@ -15,6 +15,9 @@
 #include <pthread.h>
 
 
+void testPrimary(UA_Boolean const *isPrimary);
+
+
 UA_StatusCode
 syncState(State_s *state) {
     // Implement the logic to synchronize the state with the server
@@ -73,7 +76,7 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
 int
 main(int argc, char *argv[]) {
     UA_Boolean isPrimary = UA_FALSE;
-    
+
     const int port = 10001;
     const char controllerIP[] = "172.17.0.1"; //"10.56.127.36";
 
