@@ -5,6 +5,8 @@
 #include <open62541/server_pubsub.h>
 #include <open62541/types.h>
 
+#define MAGICNUMBER 42
+
 typedef struct {
     UA_Int64 state;
 } State_s;
@@ -21,8 +23,5 @@ syncState(State_s *state);
 
 UA_StatusCode
 init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config);
-
-UA_StatusCode
-setupPubSub(void);
 
 #endif

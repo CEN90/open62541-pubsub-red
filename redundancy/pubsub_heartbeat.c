@@ -1,5 +1,6 @@
 #include <open62541/pubsub_heartbeat.h>
 #include <open62541/plugin/log_stdout.h>
+#include "open62541/plugin/log.h"
 #include "open62541/types.h"
 #include <stdbool.h>
 #include <string.h>
@@ -9,6 +10,7 @@
 #include <sys/socket.h>
 
 UA_DateTime prevHbTime = 0;
+int heartbeatCount = 0;
 struct sockaddr_in server_addr;
 char buffer[BUFFER_SIZE];
 struct sockaddr_in sender;
@@ -65,9 +67,10 @@ runHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean *isPrimary
         } else {
             UA_StatusCode status = receiveHeartbeat(*sockfd, isPrimary, prevHbTime);
 
-            if(status == UA_STATUSCODE_GOOD) {
-                UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");
-            } else {
+            // if(status == UA_STATUSCODE_GOOD) {
+            //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");
+            // } else {
+            if(status != UA_STATUSCODE_GOOD) {
                 *isPrimary = UA_TRUE;
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                              "Primary failed. Taking over.");
@@ -125,8 +128,6 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime prevHbTime) {
 
     // Read from socket
     int isActive = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
-    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                 "Heartbeat check select returned %d on sock %d", isActive, sockfd);
 
     // Check if message
     if(isActive <= 0) {
@@ -189,7 +190,13 @@ sendHeartbeat(int const *sockfd) {
         close(*sockfd);
         return UA_STATUSCODE_BAD;
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Yeeted");
+
+    if(heartbeatCount >= HEARTBEATYEETCOUNT) {
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Yeeted %d heartbeats", heartbeatCount);
+        heartbeatCount = 0;
+    }
+
+    heartbeatCount += 1;
 
     return UA_STATUSCODE_GOOD;
 }

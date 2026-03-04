@@ -1,5 +1,7 @@
-#include "open62541/pubsub_redundancy.h"
-#include "open62541/pubsub_heartbeat.h"
+#include <open62541/pubsub_redundancy.h>
+#include <open62541/pubsub_heartbeat.h>
+#include <open62541/pubsub_sync.h>
+
 
 #include <open62541/plugin/log_stdout.h>
 
@@ -15,7 +17,7 @@
 #include <pthread.h>
 
 
-void testPrimary(UA_Boolean const *isPrimary);
+void testPrimary(UA_Boolean const *isPrimary, State_s *state);
 
 
 UA_StatusCode
@@ -27,34 +29,30 @@ syncState(State_s *state) {
     return UA_STATUSCODE_GOOD;
 }
 
-UA_StatusCode
-setupPubSub(void) {
-    return UA_STATUSCODE_GOOD;
-}
 
 void
-testPrimary(UA_Boolean const *isPrimary) {
-    UA_Boolean prevValue = *isPrimary;
-
+testPrimary(UA_Boolean const *isPrimary, State_s *state) {
     while (1) {
-        if (*isPrimary != prevValue) {
-            UA_LOG_INFO(
-                UA_Log_Stdout,
-                UA_LOGCATEGORY_USERLAND,
-                "Primary status changed to %s", *isPrimary ? "true" : "false"
-            );
-            prevValue = *isPrimary;
-        }
+        if (*isPrimary) 
+            state->state += 1;
+        
+        UA_LOG_INFO(
+                    UA_Log_Stdout,
+                    UA_LOGCATEGORY_USERLAND,
+                    "Sequence number: %d", state->state
+                );
 
         sleep(1);
     }
 }
+
 
 UA_StatusCode
 init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
     int sockfd = 0;
 
     pthread_t heartbeatThread;
+    pthread_t syncThread;
 
     HeartbeatConfig heartbeatConfig = {
         .ipAddress = config->ipAddress,
@@ -63,10 +61,17 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
         .isPrimary = isPrimary,
     };
 
+    cbstruct_s stateStruct = {
+        state,
+        isPrimary
+    };
+
     pthread_create(&heartbeatThread, NULL, initHeartBeat, &heartbeatConfig);
+    pthread_create(&syncThread, NULL, initSync, &stateStruct);
 
-    testPrimary(isPrimary);
+    testPrimary(isPrimary, state);
 
+    pthread_join(syncThread, NULL);
     pthread_join(heartbeatThread, NULL);
 
     close(sockfd);
@@ -76,6 +81,7 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
 int
 main(int argc, char *argv[]) {
     UA_Boolean isPrimary = UA_FALSE;
+    State_s state = { .state = (UA_Int64) MAGICNUMBER };
 
     const int port = 10001;
     const char controllerIP[] = "172.17.0.1"; //"10.56.127.36";
@@ -85,7 +91,7 @@ main(int argc, char *argv[]) {
         .ipAddress = controllerIP,
     };
 
-    init(&isPrimary, NULL, &config);
+    init(&isPrimary, &state, &config);
 
     return 0;
 }

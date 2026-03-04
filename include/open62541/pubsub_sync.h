@@ -15,7 +15,7 @@
 
 //struct with Struct_s and isPrimary
 typedef struct {
-    State_s *dataType;
+    State_s *data;
     UA_Boolean *isPrimary;
 } cbstruct_s;
 
@@ -36,7 +36,35 @@ static void
 addDataSetWriter(UA_Server *server);
 
 static void
-run(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddressUrl,
+addReaderGroup(UA_Server *server);
+
+static void
+addDataSetReader(UA_Server *server);
+
+static void
+addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId);
+
+static void
+fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData);
+
+// Test functions
+static void
+printServerVars(UA_Server *server);
+
+static void
+callbackPrintVars(UA_Server *server, void *data);
+
+static void
+onDemandSync(UA_Server *server, void *data);
+
+static void
+setupPubSub(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config);
+
+void*
+initSync(void *data);
+
+void
+runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddressUrl,
     UA_Boolean *isPrimary, State_s *state);
 
 #endif

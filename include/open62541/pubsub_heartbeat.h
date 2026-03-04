@@ -15,6 +15,7 @@
 #define HEARBEATIMEOUT 30
 #define INITSLEEP 2
 #define HEARTBEATPERIOD 1
+#define HEARTBEATYEETCOUNT 10
 
 typedef struct {
     const char *ipAddress;
