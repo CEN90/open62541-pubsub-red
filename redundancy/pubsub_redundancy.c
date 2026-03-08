@@ -33,9 +33,9 @@ syncState(State_s *state) {
 void
 testPrimary(UA_Boolean const *isPrimary, State_s *state) {
     while (1) {
-        if (*isPrimary) 
+        if (*isPrimary)
             state->state += 1;
-        
+
         UA_LOG_INFO(
                     UA_Log_Stdout,
                     UA_LOGCATEGORY_USERLAND,
@@ -80,11 +80,17 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
 
 int
 main(int argc, char *argv[]) {
-    UA_Boolean isPrimary = UA_FALSE;
+    UA_Boolean isPrimary = (argc > 1 && strcmp(argv[1], "primary") == 0);
     State_s state = { .state = (UA_Int64) MAGICNUMBER };
 
     const int port = 10001;
-    const char controllerIP[] = "172.17.0.1"; //"10.56.127.36";
+    const char *controllerIP;
+
+    if(isPrimary) {
+        controllerIP = "172.17.0.1";
+    } else {
+        controllerIP = "172.17.0.2";
+    }
 
     connectionConfig_s config = {
         .port = &port,

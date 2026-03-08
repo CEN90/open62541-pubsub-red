@@ -58,7 +58,7 @@ addPublishedDataSet(UA_Server *server) {
 static UA_NodeId
 addStateVariable(UA_Server *server, State_s *state) {
     UA_VariableAttributes attr = UA_VariableAttributes_default;
-    attr.displayName = UA_LOCALIZEDTEXT("en-US", "State");
+    attr.displayName = UA_LOCALIZEDTEXT("en-US", "state");
     attr.dataType = UA_TYPES[UA_TYPES_INT64].typeId;
     attr.valueRank = -1;
     UA_Variant value;
@@ -66,11 +66,11 @@ addStateVariable(UA_Server *server, State_s *state) {
     UA_Variant_setScalar(&value, &(state->state), &UA_TYPES[UA_TYPES_INT64]);
     attr.value = value;
 
-    UA_NodeId stateNodeId = UA_NODEID_STRING(1, "State");
+    UA_NodeId stateNodeId = UA_NODEID_STRING(1, "state");
     UA_Server_addVariableNode(server, stateNodeId,
         UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
         UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
-        UA_QUALIFIEDNAME(1, "State"),
+        UA_QUALIFIEDNAME(1, "state"),
         UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
         attr, NULL, NULL);
 
@@ -84,7 +84,7 @@ addStateDataField(UA_Server *server, State_s *state) {
     UA_DataSetFieldConfig dataSetFieldConfig;
     memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
     dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
-    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("State");
+    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("state");
     dataSetFieldConfig.field.variable.promotedField = UA_FALSE;
     dataSetFieldConfig.field.variable.publishParameters.publishedVariable = addStateVariable(server, state);
     dataSetFieldConfig.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
@@ -222,7 +222,7 @@ addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId) {
 
         UA_NodeId newNode;
         /* With only one field (index 0), map to the.int64 node */
-        UA_NodeId targetNodeId = UA_NODEID_STRING(1, "the.int64");
+        UA_NodeId targetNodeId = UA_NODEID_STRING(1, "state");
 
         UA_Server_addVariableNode(server, targetNodeId,
                                   folderId, UA_NS0ID(HASCOMPONENT),
@@ -232,7 +232,7 @@ addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId) {
 
         /* For creating Targetvariables */
         targetVars[i].attributeId  = UA_ATTRIBUTEID_VALUE;
-        targetVars[i].targetNodeId = newNode;
+        targetVars[i].targetNodeId = targetNodeId;
     }
 
     UA_Server_DataSetReader_createTargetVariables(server, dataSetReaderId,
@@ -258,7 +258,7 @@ fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
     UA_NodeId_copy(&UA_TYPES[UA_TYPES_INT64].typeId,
                    &pMetaData->fields[0].dataType);
     pMetaData->fields[0].builtInType = UA_NS0ID_INT64;
-    pMetaData->fields[0].name =  UA_STRING ("Int64");
+    pMetaData->fields[0].name =  UA_STRING ("state");
     pMetaData->fields[0].valueRank = -1; /* scalar */
 }
 
@@ -273,7 +273,7 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_Server_readValue(server, UA_NODEID_STRING(1, "the.int64"), &value);
+    UA_Server_readValue(server, UA_NODEID_STRING(1, "state"), &value);
 
     if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_INT64])) {
         int64_t state = *(int64_t *)value.data;
@@ -290,7 +290,7 @@ setSyncState(UA_Server *server, State_s *stateStruct) {
 
     UA_Int64 state = stateStruct->state;
     UA_Variant_setScalar(&value, &state, &UA_TYPES[UA_TYPES_INT64]);
-    UA_Server_writeValue(server, UA_NODEID_STRING(1, "the.int64"), value);
+    UA_Server_writeValue(server, UA_NODEID_STRING(1, "state"), value);
 }
 
 
