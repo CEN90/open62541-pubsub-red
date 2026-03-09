@@ -9,6 +9,7 @@
 #include "open62541/types.h"
 
 #include <stdbool.h>
+#include <string.h>
 #include <unistd.h>  // close()
 
 #include <arpa/inet.h>  // inet_pton()
@@ -36,11 +37,11 @@ testPrimary(UA_Boolean const *isPrimary, State_s *state) {
         if (*isPrimary)
             state->state += 1;
 
-        // UA_LOG_INFO(
-        //             UA_Log_Stdout,
-        //             UA_LOGCATEGORY_USERLAND,
-        //             "Sequence number: %d", state->state
-        //         );
+        UA_LOG_INFO(
+                    UA_Log_Stdout,
+                    UA_LOGCATEGORY_USERLAND,
+                    "Sequence number: %d", state->state
+                );
 
         sleep(1);
     }
@@ -80,11 +81,17 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
 
 int
 main(int argc, char *argv[]) {
+    const int port = 10001;
     UA_Boolean isPrimary = UA_FALSE;
+    char controllerIP[IPADDRLEN] = "127.0.0.1";
     State_s state = { .state = (UA_Int64) MAGICNUMBER };
 
-    const int port = 10001;
-    const char controllerIP[] = "192.168.0.148"; //"172.17.0.1"; //"10.56.127.36";
+    if (argc > 2) {
+        if(strcmp(argv[1], "--ip-backup") == 0) {
+            isPrimary = UA_TRUE;
+            strcpy(controllerIP, argv[2]);
+        }
+    }
 
     connectionConfig_s config = {
         .port = &port,

@@ -10,7 +10,7 @@
 #include <sys/socket.h>
 
 UA_DateTime prevHbTime = 0;
-int heartbeatCount = 0;
+// int heartbeatCount = 0; // Consider remove this
 struct sockaddr_in server_addr;
 char buffer[BUFFER_SIZE];
 struct sockaddr_in sender;
@@ -181,7 +181,6 @@ setupHeartbeatSender(const char *ipAddress, int port, int *sockfd) {
 
 UA_StatusCode
 sendHeartbeat(int const *sockfd) {
-    // Send heartbeat message
     ssize_t sent = sendto(*sockfd, HEARTBEAT_MSG, strlen(HEARTBEAT_MSG), 0,
                           (const struct sockaddr *)&server_addr, sizeof(server_addr));
 
@@ -191,12 +190,12 @@ sendHeartbeat(int const *sockfd) {
         return UA_STATUSCODE_BAD;
     }
 
-    if(heartbeatCount >= HEARTBEATYEETCOUNT) {
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Yeeted %d heartbeats", heartbeatCount);
-        heartbeatCount = 0;
-    }
+    // if(heartbeatCount >= HEARTBEATYEETCOUNT) {
+    //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Yeeted %d heartbeats", heartbeatCount);
+    //     heartbeatCount = 0;
+    // }
 
-    heartbeatCount += 1;
+    // heartbeatCount += 1;
 
     return UA_STATUSCODE_GOOD;
 }

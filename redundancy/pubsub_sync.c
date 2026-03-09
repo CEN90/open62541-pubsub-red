@@ -296,7 +296,7 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
     if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_INT64])) {
         int64_t state = *(int64_t *)value.data;
         stateStruct->state = state;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state read: %lld", state);
+        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state read: %lld", state);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
                      "state.receiver is not an Int64 type");
@@ -313,7 +313,7 @@ setSyncState(UA_Server *server, State_s *stateStruct) {
     UA_Int64 state = stateStruct->state;
     UA_Variant_setScalar(&value, &state, &UA_TYPES[UA_TYPES_INT64]);
     UA_Server_writeValue(server, UA_NODEID_STRING(1, "state"), value);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state send: %lld", state);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state send: %lld", state);
 }
 
 
@@ -406,15 +406,15 @@ runPubSub(UA_String *transportProfile,
     lastIsPrimary = *isPrimary;
     
     if (*isPrimary) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
-                        "Starting as PRIMARY: Enabling WriterGroup, disabling ReaderGroup");
-            UA_Server_enableWriterGroup(server, writerGroupIdent);
-            UA_Server_disableReaderGroup(server, readerGroupIdentifier);
-        } else {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
-                        "Starting as BACKUP: Disabling WriterGroup, enabling ReaderGroup");
-            UA_Server_disableWriterGroup(server, writerGroupIdent);
-            UA_Server_enableReaderGroup(server, readerGroupIdentifier);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                    "Starting as primary: Enabling WriterGroup, disabling ReaderGroup");
+        UA_Server_enableWriterGroup(server, writerGroupIdent);
+        UA_Server_disableReaderGroup(server, readerGroupIdentifier);
+    } else {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                    "Starting as backup: Disabling WriterGroup, enabling ReaderGroup");
+        UA_Server_disableWriterGroup(server, writerGroupIdent);
+        UA_Server_enableReaderGroup(server, readerGroupIdentifier);
     }
 
     // CB for publishing/reading state

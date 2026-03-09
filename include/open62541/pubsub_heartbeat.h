@@ -14,8 +14,8 @@
 #define BUFFER_SIZE 1024
 #define HEARBEATIMEOUT 30
 #define INITSLEEP 2
-#define HEARTBEATPERIOD 1
-#define HEARTBEATYEETCOUNT 10
+#define HEARTBEATPERIOD 0.1
+#define HEARTBEATYEETCOUNT 1000
 
 typedef struct {
     const char *ipAddress;
