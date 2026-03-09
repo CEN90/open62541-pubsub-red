@@ -27,7 +27,7 @@ static void
 addPublishedDataSet(UA_Server *server);
 
 static void
-addStateDataField(UA_Server *server, State_s *state);
+addStateDataField(UA_Server *server, State_s *state, UA_NodeId *stateNodeId);
 
 static void
 addWriterGroup(UA_Server *server);
@@ -42,7 +42,7 @@ static void
 addDataSetReader(UA_Server *server);
 
 static void
-addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId);
+addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId, UA_NodeId *stateNodeId);
 
 static void
 fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData);

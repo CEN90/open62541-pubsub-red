@@ -16,6 +16,7 @@ static UA_NodeId connectionIdentifier,
                  readerIdentifier;
 
 static UA_DataSetReaderConfig readerConfig;
+static UA_Boolean lastIsPrimary = UA_FALSE;
 
 
 static void
@@ -58,7 +59,7 @@ addPublishedDataSet(UA_Server *server) {
 static UA_NodeId
 addStateVariable(UA_Server *server, State_s *state) {
     UA_VariableAttributes attr = UA_VariableAttributes_default;
-    attr.displayName = UA_LOCALIZEDTEXT("en-US", "state.sender");
+    attr.displayName = UA_LOCALIZEDTEXT("en-US", "state");
     attr.dataType = UA_TYPES[UA_TYPES_INT64].typeId;
     attr.valueRank = -1;
     UA_Variant value;
@@ -66,11 +67,11 @@ addStateVariable(UA_Server *server, State_s *state) {
     UA_Variant_setScalar(&value, &(state->state), &UA_TYPES[UA_TYPES_INT64]);
     attr.value = value;
 
-    UA_NodeId stateNodeId = UA_NODEID_STRING(1, "state.sender");
+    UA_NodeId stateNodeId = UA_NODEID_STRING(1, "state");
     UA_Server_addVariableNode(server, stateNodeId,
         UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
         UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
-        UA_QUALIFIEDNAME(1, "state.sender"),
+        UA_QUALIFIEDNAME(1, "state"),
         UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
         attr, NULL, NULL);
 
@@ -79,14 +80,16 @@ addStateVariable(UA_Server *server, State_s *state) {
 }
 
 static void
-addStateDataField(UA_Server *server, State_s *state) {
+addStateDataField(UA_Server *server, State_s *state, UA_NodeId *stateNodeId) {
     UA_NodeId dataSetFieldIdent;
     UA_DataSetFieldConfig dataSetFieldConfig;
+
+    *stateNodeId = addStateVariable(server, state);
     memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
     dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
-    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("state.sender");
+    dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("state");
     dataSetFieldConfig.field.variable.promotedField = UA_FALSE;
-    dataSetFieldConfig.field.variable.publishParameters.publishedVariable = addStateVariable(server, state);
+    dataSetFieldConfig.field.variable.publishParameters.publishedVariable = *stateNodeId;
     dataSetFieldConfig.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
     UA_Server_addDataSetField(server, publishedDataSetIdent,
                               &dataSetFieldConfig, &dataSetFieldIdent);
@@ -179,7 +182,7 @@ addDataSetReader(UA_Server *server) {
 }
 
 static void
-addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId) {
+addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId, UA_NodeId *stateNodeId) {
     UA_NodeId folderId;
     UA_String folderName = readerConfig.dataSetMetaData.name;
     UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
@@ -226,13 +229,14 @@ addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId) {
 
         UA_Server_addVariableNode(server, targetNodeId,
                                   folderId, UA_NS0ID(HASCOMPONENT),
-                                  UA_QUALIFIEDNAME(1, (char *)readerConfig.dataSetMetaData.fields[i].name.data),
+                                  UA_QUALIFIEDNAME(1, "state.receiver"),
+                                  //UA_QUALIFIEDNAME(1, (char *)readerConfig.dataSetMetaData.fields[i].name.data),
                                   UA_NS0ID(BASEDATAVARIABLETYPE),
                                   vAttr, NULL, &newNode);
 
         /* For creating Targetvariables */
         targetVars[i].attributeId  = UA_ATTRIBUTEID_VALUE;
-        targetVars[i].targetNodeId = newNode;
+        targetVars[i].targetNodeId = targetNodeId;
     }
 
     UA_Server_DataSetReader_createTargetVariables(server, dataSetReaderId,
@@ -258,7 +262,7 @@ fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
     UA_NodeId_copy(&UA_TYPES[UA_TYPES_INT64].typeId,
                    &pMetaData->fields[0].dataType);
     pMetaData->fields[0].builtInType = UA_NS0ID_INT64;
-    pMetaData->fields[0].name =  UA_STRING ("state.receiver");
+    pMetaData->fields[0].name =  UA_STRING ("state");
     pMetaData->fields[0].valueRank = -1; /* scalar */
 }
 
@@ -273,14 +277,32 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_Server_readValue(server, UA_NODEID_STRING(1, "state.receiver"), &value);
+    UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "state.receiver"), &value);
+    
+    if (retval != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                     "Failed to read state.receiver: 0x%08x", retval);
+        UA_Variant_clear(&value);
+        return;
+    }
+
+    if (value.data == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                     "state.receiver has no data");
+        UA_Variant_clear(&value);
+        return;
+    }
 
     if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_INT64])) {
         int64_t state = *(int64_t *)value.data;
         stateStruct->state = state;
-
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state read: %lld", state);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                     "state.receiver is not an Int64 type");
     }
+    
+    UA_Variant_clear(&value);
 }
 
 static void
@@ -290,18 +312,44 @@ setSyncState(UA_Server *server, State_s *stateStruct) {
 
     UA_Int64 state = stateStruct->state;
     UA_Variant_setScalar(&value, &state, &UA_TYPES[UA_TYPES_INT64]);
-    UA_Server_writeValue(server, UA_NODEID_STRING(1, "state.sender"), value);
+    UA_Server_writeValue(server, UA_NODEID_STRING(1, "state"), value);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state send: %lld", state);
 }
 
 
 static void
 onDemandSync(UA_Server *server, void *data){
     cbstruct_s *stateStruct = (cbstruct_s *)data;
+    UA_Boolean currentIsPrimary = *stateStruct->isPrimary;
 
-    if (*stateStruct->isPrimary) { // we want to yeet state
+    /* Check for role change: Backup -> Primary failover */
+    if (currentIsPrimary && !lastIsPrimary) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                    "FAILOVER TRIGGERED: Taking over as PRIMARY");
+        
+        /* Disable reader group (stop listening) - MUST be done first */
+        UA_StatusCode retval = UA_Server_disableReaderGroup(server, readerGroupIdentifier);
+        if (retval != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                        "Failed to disable ReaderGroup: 0x%08x", retval);
+        }
+        
+        /* Enable writer group (start publishing) */
+        retval = UA_Server_enableWriterGroup(server, writerGroupIdent);
+        if (retval != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                        "Failed to enable WriterGroup: 0x%08x", retval);
+        }
+        
+        lastIsPrimary = currentIsPrimary;
+    }
+
+    if (currentIsPrimary) {
+        /* PRIMARY: Publish current state */
         setSyncState(server, stateStruct->data);
         UA_Server_WriterGroup_publish(server, writerGroupIdent);
-    } else { // we want to fetch state
+    } else {
+        /* BACKUP: Read latest state from subscriber variables */
         readSyncState(server, stateStruct->data);
     }
 }
@@ -336,6 +384,8 @@ runPubSub(UA_String *transportProfile,
 
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *config = UA_Server_getConfig(server);
+    UA_NodeId stateNodeId;
+
     UA_ServerConfig_setDefault(config);
 
     // common
@@ -343,16 +393,29 @@ runPubSub(UA_String *transportProfile,
 
     // publisher
     addPublishedDataSet(server);
-    addStateDataField(server, state);
+    addStateDataField(server, state, &stateNodeId);
     addWriterGroup(server);
     addDataSetWriter(server);
 
     // subscriber
     addReaderGroup(server);
     addDataSetReader(server);
-    addSubscribedVariables(server, readerIdentifier);
+    addSubscribedVariables(server, readerIdentifier, &stateNodeId);
 
     cbstruct_s stateStruct = {state, isPrimary};
+    lastIsPrimary = *isPrimary;
+    
+    if (*isPrimary) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                        "Starting as PRIMARY: Enabling WriterGroup, disabling ReaderGroup");
+            UA_Server_enableWriterGroup(server, writerGroupIdent);
+            UA_Server_disableReaderGroup(server, readerGroupIdentifier);
+        } else {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+                        "Starting as BACKUP: Disabling WriterGroup, enabling ReaderGroup");
+            UA_Server_disableWriterGroup(server, writerGroupIdent);
+            UA_Server_enableReaderGroup(server, readerGroupIdentifier);
+    }
 
     // CB for publishing/reading state
     UA_Server_addRepeatedCallback(server,

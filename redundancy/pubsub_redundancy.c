@@ -33,14 +33,14 @@ syncState(State_s *state) {
 void
 testPrimary(UA_Boolean const *isPrimary, State_s *state) {
     while (1) {
-        if (*isPrimary) 
+        if (*isPrimary)
             state->state += 1;
-        
-        UA_LOG_INFO(
-                    UA_Log_Stdout,
-                    UA_LOGCATEGORY_USERLAND,
-                    "Sequence number: %d", state->state
-                );
+
+        // UA_LOG_INFO(
+        //             UA_Log_Stdout,
+        //             UA_LOGCATEGORY_USERLAND,
+        //             "Sequence number: %d", state->state
+        //         );
 
         sleep(1);
     }
@@ -84,7 +84,7 @@ main(int argc, char *argv[]) {
     State_s state = { .state = (UA_Int64) MAGICNUMBER };
 
     const int port = 10001;
-    const char controllerIP[] = "172.17.0.1"; //"10.56.127.36";
+    const char controllerIP[] = "192.168.0.148"; //"172.17.0.1"; //"10.56.127.36";
 
     connectionConfig_s config = {
         .port = &port,
