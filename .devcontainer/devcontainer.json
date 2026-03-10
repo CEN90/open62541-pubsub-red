@@ -11,8 +11,11 @@
     "--cap-add=SYS_PTRACE",
     "--security-opt",
     "seccomp=unconfined",
+    "--net=host",
     "-p",
-    "10001:10001/udp"
+    "10001:10001/udp",
+    "-p",
+    "4840:4840/udp"
   ],
   "forwardPorts": [
     4840
