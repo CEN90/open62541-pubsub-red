@@ -4,6 +4,7 @@
 #include <open62541/server.h>
 #include <open62541/server_pubsub.h>
 #include <open62541/types.h>
+
 #include <stdbool.h>
 #include <unistd.h>
 
@@ -12,7 +13,7 @@
 
 #define HEARTBEAT_MSG "HEARTBEAT"
 #define BUFFER_SIZE 1024
-#define HEARBEATIMEOUT 30
+#define HEARBEATIMEOUT 300
 #define INITSLEEP 2
 #define HEARTBEATPERIOD 0.1
 #define HEARTBEATYEETCOUNT 1000
@@ -24,8 +25,8 @@ typedef struct {
     UA_Boolean *isPrimary;
 } HeartbeatConfig;
 
-void*
-initHeartBeat(void* arg);
+void *
+initHeartBeat(void *arg);
 
 UA_StatusCode
 setupHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean const *isPrimary);
@@ -43,6 +44,6 @@ UA_StatusCode
 sendHeartbeat(int const *sockfd);
 
 UA_StatusCode
-receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime prevHbTime);
+receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime);
 
-#endif // OPEN62541_PUBSUB_HEARTBEAT_H
+#endif  // OPEN62541_PUBSUB_HEARTBEAT_H

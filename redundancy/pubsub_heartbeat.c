@@ -65,7 +65,7 @@ runHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean *isPrimary
         if(*isPrimary) {
             sendHeartbeat(sockfd);
         } else {
-            UA_StatusCode status = receiveHeartbeat(*sockfd, isPrimary, prevHbTime);
+            UA_StatusCode status = receiveHeartbeat(*sockfd, isPrimary, &prevHbTime);
 
             // if(status == UA_STATUSCODE_GOOD) {
             //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");
@@ -116,7 +116,7 @@ setupHeartbeatReceiver(int port, int *sockfd) {
    Non-blocking heartbeat check
 ----------------------------------------- */
 UA_StatusCode
-receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime prevHbTime) {
+receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
 
     fd_set readfds;
     FD_ZERO(&readfds);
@@ -143,13 +143,13 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime prevHbTime) {
         if(bytes > 0) {
             char sender_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(sender.sin_addr), sender_ip, INET_ADDRSTRLEN);
-            prevHbTime = UA_DateTime_nowMonotonic();
+            *prevHbTime = UA_DateTime_nowMonotonic();
         }
     }
 
     // Timeout detection
     long long now = UA_DateTime_nowMonotonic();
-    if(prevHbTime != 0 && now - prevHbTime > HEARBEATIMEOUT) {
+    if(*prevHbTime != 0 && now - *prevHbTime > HEARBEATIMEOUT) {
         return UA_STATUSCODE_BAD;
     }
 
