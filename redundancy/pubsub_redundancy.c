@@ -1,13 +1,12 @@
-#include <open62541/pubsub_redundancy.h>
-#include <open62541/pubsub_heartbeat.h>
-#include <open62541/pubsub_sync.h>
-
-
 #include <open62541/plugin/log_stdout.h>
+#include <open62541/pubsub_heartbeat.h>
+#include <open62541/pubsub_redundancy.h>
+#include <open62541/pubsub_sync.h>
 
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
 
+#include <pthread.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>  // close()
@@ -15,11 +14,8 @@
 #include <arpa/inet.h>  // inet_pton()
 #include <sys/socket.h>
 
-#include <pthread.h>
-
-
-void testPrimary(UA_Boolean const *isPrimary, State_s *state);
-
+void
+testPrimary(UA_Boolean const *isPrimary, State_s *state);
 
 UA_StatusCode
 syncState(State_s *state) {
@@ -30,23 +26,18 @@ syncState(State_s *state) {
     return UA_STATUSCODE_GOOD;
 }
 
-
 void
 testPrimary(UA_Boolean const *isPrimary, State_s *state) {
-    while (1) {
-        if (*isPrimary)
+    while(1) {
+        if(*isPrimary)
             state->state += 1;
 
-        UA_LOG_INFO(
-                    UA_Log_Stdout,
-                    UA_LOGCATEGORY_USERLAND,
-                    "Sequence number: %d", state->state
-                );
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Sequence number: %d",
+                    state->state);
 
         sleep(1);
     }
 }
-
 
 UA_StatusCode
 init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
@@ -62,10 +53,7 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
         .isPrimary = isPrimary,
     };
 
-    cbstruct_s stateStruct = {
-        state,
-        isPrimary
-    };
+    cbstruct_s stateStruct = {state, isPrimary};
 
     pthread_create(&heartbeatThread, NULL, initHeartBeat, &heartbeatConfig);
     pthread_create(&syncThread, NULL, initSync, &stateStruct);
@@ -84,13 +72,17 @@ main(int argc, char *argv[]) {
     const int port = 10001;
     UA_Boolean isPrimary = UA_FALSE;
     char controllerIP[IPADDRLEN] = "127.0.0.1";
-    State_s state = { .state = (UA_Int64) MAGICNUMBER };
+    State_s state = {.state = (UA_Int64)MAGICNUMBER};
 
-    if (argc > 2) {
-        if(strcmp(argv[1], "--ip-backup") == 0) {
+    if(argc > 2) {
+        if(strcmp(argv[1], "--primary") == 0)
             isPrimary = UA_TRUE;
+
+        if(strcmp(argv[1], "--backup") == 0)
+            isPrimary = UA_FALSE;
+
+        if(argc > 3)
             strcpy(controllerIP, argv[2]);
-        }
     }
 
     connectionConfig_s config = {
