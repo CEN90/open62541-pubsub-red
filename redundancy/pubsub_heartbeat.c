@@ -80,7 +80,7 @@ runHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean *isPrimary
             }
         }
 
-        sleep(HEARTBEATPERIOD);
+        usleep((__useconds_t)HEARTBEATPERIOD);
     }
 }
 
@@ -157,8 +157,8 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     }
 
     // Timeout detection
-    long long now = UA_DateTime_nowMonotonic();
-    long long time_ago = now - *prevHbTime;
+    UA_DateTime now = UA_DateTime_nowMonotonic();
+    UA_DateTime time_ago = now - *prevHbTime;
     if (*prevHbTime != 0 && time_ago > HEARBEATIMEOUT) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Heartbeat timeout (%lld ms)", time_ago);
         
