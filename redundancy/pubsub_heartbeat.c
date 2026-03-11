@@ -4,6 +4,9 @@
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
 
+#include <errno.h>
+#include <error.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
@@ -101,6 +104,9 @@ setupHeartbeatReceiver(int port, int *sockfd) {
     if(sock < 0)
         return UA_STATUSCODE_BAD;
 
+    int flags = fcntl(sock, F_GETFL, 0);
+    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
@@ -151,25 +157,36 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     }
 
     if(events[0].events & EPOLLIN) {
-        while(1) {
+        UA_DateTime newest = 0;
 
+        while(1) {
             int bytes = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0,
                                  (struct sockaddr *)&sender, &senderLen);
 
-            if(bytes <= 0)
-                break;
-
-            UA_DateTime now = UA_DateTime_nowMonotonic();
-
-            if(*prevHbTime != 0) {
-                UA_DateTime diff = now - *prevHbTime;
-                UA_Int64 diff_ms = diff / UA_DATETIME_MSEC;
-
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                            "Heartbeat received after %lld ms", diff_ms);
+            if(bytes < 0) {
+                if(errno == EAGAIN || errno == EWOULDBLOCK)
+                    break;  // all packets drained
+                else
+                    return UA_STATUSCODE_BAD;  // real error
             }
 
-            *prevHbTime = now;
+            if(bytes == 0)
+                continue;  // empty packet, ignore
+
+            newest = UA_DateTime_nowMonotonic();  // record timestamp of last packet
+        }
+
+        if(newest != 0) {
+            if(*prevHbTime != 0) {
+                UA_Int64 diff_ms = (newest - *prevHbTime) / UA_DATETIME_MSEC;
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                            "Heartbeat received after %lld ms", diff_ms);
+            } else {
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                            "First heartbeat received");
+            }
+
+            *prevHbTime = newest;  // update once per epoll wakeup
         }
     }
 
