@@ -32,8 +32,8 @@ testPrimary(UA_Boolean const *isPrimary, State_s *state) {
         if(*isPrimary)
             state->state += 1;
 
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Sequence number: %d",
-                    state->state);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "isPrimary: %d, Sequence number: %d",
+                    *isPrimary, state->state);
 
         sleep(1);
     }
