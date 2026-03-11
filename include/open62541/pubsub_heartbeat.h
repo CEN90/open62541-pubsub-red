@@ -11,11 +11,11 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-#define HEARTBEAT_MSG "HEARTBEAT"
+#define HEARTBEAT_MSG "\n"
 #define BUFFER_SIZE 1024
-#define HEARBEATIMEOUT 300
+#define HEARBEATIMEOUT 30
 #define INITSLEEP 2
-#define HEARTBEATPERIOD 1
+#define HEARTBEATPERIOD 0.5
 #define HEARTBEATSLACK 10
 #define HEARTBEATYEETCOUNT 1000
 

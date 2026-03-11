@@ -158,7 +158,10 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
 
     // Timeout detection
     long long now = UA_DateTime_nowMonotonic();
-    if (*prevHbTime != 0 && now - *prevHbTime > HEARBEATIMEOUT) {
+    long long time_ago = now - *prevHbTime;
+    if (*prevHbTime != 0 && time_ago > HEARBEATIMEOUT) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Heartbeat timeout (%lld ms)", time_ago);
+        
         return UA_STATUSCODE_BAD;
     }
 
