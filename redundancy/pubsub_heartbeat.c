@@ -1,14 +1,16 @@
-#include <open62541/pubsub_heartbeat.h>
 #include <open62541/plugin/log_stdout.h>
+#include <open62541/pubsub_heartbeat.h>
+
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
+
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/epoll.h>
 
+#include <arpa/inet.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
 
 UA_DateTime prevHbTime = 0;
 int epoll_fd = -1;
@@ -18,26 +20,28 @@ char buffer[BUFFER_SIZE];
 struct sockaddr_in sender;
 socklen_t senderLen = sizeof(sender);
 
-void*
-initHeartBeat(void* arg) {
-    HeartbeatConfig *config = (HeartbeatConfig*) arg;
+void *
+initHeartBeat(void *arg) {
+    HeartbeatConfig *config = (HeartbeatConfig *)arg;
 
-    UA_StatusCode initStatus = setupHeartbeat(config->ipAddress, *config->port, config->sockfd, config->isPrimary);
+    UA_StatusCode initStatus = setupHeartbeat(config->ipAddress, *config->port,
+                                              config->sockfd, config->isPrimary);
     if(initStatus != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Failed to init heartbeat");
         return NULL;
     }
 
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Heartbeat initialized, isPrimary=%d", *config->isPrimary);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                "Heartbeat initialized, isPrimary=%d", *config->isPrimary);
 
     runHeartbeat(config->ipAddress, *config->port, config->sockfd, config->isPrimary);
 
     return NULL;
 }
 
-
 UA_StatusCode
-setupHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean const *isPrimary) {
+setupHeartbeat(const char *ipAddress, int port, int *sockfd,
+               UA_Boolean const *isPrimary) {
     // Init
     if(*isPrimary) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Init primary");
@@ -48,7 +52,8 @@ setupHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean const *i
         UA_StatusCode status = setupHeartbeatReceiver(port, sockfd);
 
         if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Failed to init heartbeat listener");
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                         "Failed to init heartbeat listener");
             return UA_STATUSCODE_BAD;
         }
     }
@@ -103,10 +108,10 @@ setupHeartbeatReceiver(int port, int *sockfd) {
 
     if(bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(sock);
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,"Failed to bind socket\n");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Failed to bind socket\n");
         return UA_STATUSCODE_BAD;
     }
-    
+
     epoll_fd = epoll_create1(0);
     if(epoll_fd == -1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "epoll_create1 failed");
@@ -138,18 +143,28 @@ setupHeartbeatReceiver(int port, int *sockfd) {
 UA_StatusCode
 receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     struct epoll_event events[1];
-    int nfds = epoll_wait(epoll_fd, events, 1, HEARTBEATSLACK); // 0 ms timeout for non-blocking
+    int nfds = epoll_wait(epoll_fd, events, 1, 0);  // 0 ms timeout for non-blocking
 
-    if (nfds <= 0) {
+    if(nfds <= 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
         return UA_STATUSCODE_BAD;
     }
 
-    if (events[0].events & EPOLLIN) {
-        int bytes = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0, (struct sockaddr *)&sender,
-                             &senderLen);
+    if(events[0].events & EPOLLIN) {
+        int bytes = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0,
+                             (struct sockaddr *)&sender, &senderLen);
 
-        if (bytes > 0) {
+        if(bytes > 0) {
+            UA_DateTime now = UA_DateTime_nowMonotonic();
+
+            if(*prevHbTime != 0) {
+                UA_DateTime diff = now - *prevHbTime;
+                UA_Int64 diff_ms = diff / UA_DATETIME_MSEC;
+
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                            "Heartbeat received after %lld ms", diff_ms);
+            }
+
             char sender_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(sender.sin_addr), sender_ip, INET_ADDRSTRLEN);
             *prevHbTime = UA_DateTime_nowMonotonic();
@@ -159,15 +174,18 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     // Timeout detection
     UA_DateTime now = UA_DateTime_nowMonotonic();
     UA_DateTime time_ago = now - *prevHbTime;
-    if (*prevHbTime != 0 && time_ago > HEARBEATIMEOUT) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Heartbeat timeout (%lld ms)", time_ago);
-        
+    if(*prevHbTime != 0 && time_ago > HEARBEATIMEOUT) {
+
+        UA_Int64 elapsed_ms = time_ago / UA_DATETIME_MSEC;
+
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "Heartbeat timeout (%lld ms)", elapsed_ms);
+
         return UA_STATUSCODE_BAD;
     }
 
     return UA_STATUSCODE_GOOD;  // primary alive
 }
-
 
 UA_StatusCode
 setupHeartbeatSender(const char *ipAddress, int port, int *sockfd) {
@@ -204,8 +222,8 @@ sendHeartbeat(int const *sockfd) {
     }
 
     // if(heartbeatCount >= HEARTBEATYEETCOUNT) {
-    //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Yeeted %d heartbeats", heartbeatCount);
-    //     heartbeatCount = 0;
+    //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Yeeted %d heartbeats",
+    //     heartbeatCount); heartbeatCount = 0;
     // }
 
     // heartbeatCount += 1;
