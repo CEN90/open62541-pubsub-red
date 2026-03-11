@@ -5,11 +5,13 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/epoll.h>
+
 
 UA_DateTime prevHbTime = 0;
+int epoll_fd = -1;
 // int heartbeatCount = 0; // Consider remove this
 struct sockaddr_in server_addr;
 char buffer[BUFFER_SIZE];
@@ -104,6 +106,24 @@ setupHeartbeatReceiver(int port, int *sockfd) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,"Failed to bind socket\n");
         return UA_STATUSCODE_BAD;
     }
+    
+    epoll_fd = epoll_create1(0);
+    if(epoll_fd == -1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "epoll_create1 failed");
+        close(sock);
+        return UA_STATUSCODE_BAD;
+    }
+
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = sock;
+
+    if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sock, &ev) == -1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "epoll_ctl failed");
+        close(epoll_fd);
+        close(sock);
+        return UA_STATUSCODE_BAD;
+    }
 
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                 "Heartbeat listener initialized on port %d", port);
@@ -117,30 +137,19 @@ setupHeartbeatReceiver(int port, int *sockfd) {
 ----------------------------------------- */
 UA_StatusCode
 receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
+    struct epoll_event events[1];
+    int nfds = epoll_wait(epoll_fd, events, 1, HEARTBEATSLACK); // 0 ms timeout for non-blocking
 
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(sockfd, &readfds);
-
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 0;  // non-blocking
-
-    // Read from socket
-    int isActive = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
-
-    // Check if message
-    if(isActive <= 0) {
+    if (nfds <= 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
         return UA_STATUSCODE_BAD;
     }
 
-    // Check if correct msg
-    if(isActive > 0 && FD_ISSET(sockfd, &readfds)) {
+    if (events[0].events & EPOLLIN) {
         int bytes = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0, (struct sockaddr *)&sender,
                              &senderLen);
 
-        if(bytes > 0) {
+        if (bytes > 0) {
             char sender_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(sender.sin_addr), sender_ip, INET_ADDRSTRLEN);
             *prevHbTime = UA_DateTime_nowMonotonic();
@@ -149,12 +158,13 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
 
     // Timeout detection
     long long now = UA_DateTime_nowMonotonic();
-    if(*prevHbTime != 0 && now - *prevHbTime > HEARBEATIMEOUT) {
+    if (*prevHbTime != 0 && now - *prevHbTime > HEARBEATIMEOUT) {
         return UA_STATUSCODE_BAD;
     }
 
     return UA_STATUSCODE_GOOD;  // primary alive
 }
+
 
 UA_StatusCode
 setupHeartbeatSender(const char *ipAddress, int port, int *sockfd) {

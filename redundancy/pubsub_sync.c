@@ -327,7 +327,7 @@ onDemandSync(UA_Server *server, void *data){
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
                     "FAILOVER TRIGGERED: Taking over as PRIMARY");
         
-        /* Disable reader group (stop listening) - MUST be done first */
+        /* Disable reader group (stop listening) */
         UA_StatusCode retval = UA_Server_disableReaderGroup(server, readerGroupIdentifier);
         if (retval != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
@@ -345,11 +345,11 @@ onDemandSync(UA_Server *server, void *data){
     }
 
     if (currentIsPrimary) {
-        /* PRIMARY: Publish current state */
+        /* PRIMARY: Publish state */
         setSyncState(server, stateStruct->data);
         UA_Server_WriterGroup_publish(server, writerGroupIdent);
     } else {
-        /* BACKUP: Read latest state from subscriber variables */
+        /* BACKUP: Read state */
         readSyncState(server, stateStruct->data);
     }
 }

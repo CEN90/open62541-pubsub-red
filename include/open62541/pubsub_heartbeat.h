@@ -16,6 +16,7 @@
 #define HEARBEATIMEOUT 300
 #define INITSLEEP 2
 #define HEARTBEATPERIOD 1
+#define HEARTBEATSLACK 10
 #define HEARTBEATYEETCOUNT 1000
 
 typedef struct {
