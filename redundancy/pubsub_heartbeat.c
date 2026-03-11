@@ -151,10 +151,14 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     }
 
     if(events[0].events & EPOLLIN) {
-        int bytes = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0,
-                             (struct sockaddr *)&sender, &senderLen);
+        while(1) {
 
-        if(bytes > 0) {
+            int bytes = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0,
+                                 (struct sockaddr *)&sender, &senderLen);
+
+            if(bytes <= 0)
+                break;
+
             UA_DateTime now = UA_DateTime_nowMonotonic();
 
             if(*prevHbTime != 0) {
@@ -165,9 +169,7 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
                             "Heartbeat received after %lld ms", diff_ms);
             }
 
-            char sender_ip[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &(sender.sin_addr), sender_ip, INET_ADDRSTRLEN);
-            *prevHbTime = UA_DateTime_nowMonotonic();
+            *prevHbTime = now;
         }
     }
 
