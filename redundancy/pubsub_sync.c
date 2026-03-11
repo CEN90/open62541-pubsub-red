@@ -225,12 +225,12 @@ addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId, UA_NodeId 
 
         UA_NodeId newNode;
         /* With only one field (index 0), map to state.receiver node */
-        UA_NodeId targetNodeId = UA_NODEID_STRING(1, "state.receiver");
+        UA_NodeId targetNodeId = UA_NODEID_STRING(1, "state");
 
         UA_Server_addVariableNode(server, targetNodeId,
                                   folderId, UA_NS0ID(HASCOMPONENT),
-                                  UA_QUALIFIEDNAME(1, "state.receiver"),
-                                  //UA_QUALIFIEDNAME(1, (char *)readerConfig.dataSetMetaData.fields[i].name.data),
+                                  // UA_QUALIFIEDNAME(1, "state.receiver"),
+                                  UA_QUALIFIEDNAME(1, (char *)readerConfig.dataSetMetaData.fields[i].name.data),
                                   UA_NS0ID(BASEDATAVARIABLETYPE),
                                   vAttr, NULL, &newNode);
 
@@ -277,18 +277,18 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "state.receiver"), &value);
+    UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "state"), &value);
     
     if (retval != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
-                     "Failed to read state.receiver: 0x%08x", retval);
+                     "Failed to read state: 0x%08x", retval);
         UA_Variant_clear(&value);
         return;
     }
 
     if (value.data == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
-                     "state.receiver has no data");
+                     "state has no data");
         UA_Variant_clear(&value);
         return;
     }
@@ -299,7 +299,7 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state read: %lld", state);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
-                     "state.receiver is not an Int64 type");
+                     "state is not an Int64 type");
     }
     
     UA_Variant_clear(&value);

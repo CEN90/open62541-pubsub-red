@@ -71,23 +71,28 @@ int
 main(int argc, char *argv[]) {
     const int port = 10001;
     UA_Boolean isPrimary = UA_FALSE;
-    char controllerIP[IPADDRLEN] = "127.0.0.1";
+    char redDcnIp[IPADDRLEN] = "127.0.0.1";
     State_s state = {.state = (UA_Int64)MAGICNUMBER};
 
-    if(argc > 2) {
+    if(argc == 3) {
+        strcpy(redDcnIp, argv[2]);
+        
         if(strcmp(argv[1], "--primary") == 0)
             isPrimary = UA_TRUE;
-
-        if(strcmp(argv[1], "--backup") == 0)
+        else if(strcmp(argv[1], "--backup") == 0)
             isPrimary = UA_FALSE;
-
-        if(argc > 3)
-            strcpy(controllerIP, argv[2]);
+        else {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Invalid argument: %s", argv[1]);
+            return -1;
+        }
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Usage: %s [--primary | --backup] <redundancy Controller IP>", argv[0]);
+        return -1;
     }
 
     connectionConfig_s config = {
         .port = &port,
-        .ipAddress = controllerIP,
+        .ipAddress = redDcnIp,
     };
 
     init(&isPrimary, &state, &config);
