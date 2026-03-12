@@ -80,7 +80,7 @@ runHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean *isPrimary
             // if(status == UA_STATUSCODE_GOOD) {
             //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");
             // } else {
-            if(status != UA_STATUSCODE_GOOD) {
+            if(status == UA_STATUSCODE_BAD) {
                 *isPrimary = UA_TRUE;
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                              "Primary failed. Taking over.");
@@ -149,11 +149,10 @@ setupHeartbeatReceiver(int port, int *sockfd) {
 UA_StatusCode
 receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     struct epoll_event events[1];
-    int nfds = epoll_wait(epoll_fd, events, 1, 0);  // 0 ms timeout for non-blocking
+    int nfds = epoll_wait(epoll_fd, events, 1, HEARTBEATSLACK);  // 0 ms timeout for non-blocking
 
     if(nfds <= 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
-        return UA_STATUSCODE_BAD;
     }
 
     if(events[0].events & EPOLLIN) {
@@ -179,10 +178,10 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
         if(newest != 0) {
             if(*prevHbTime != 0) {
                 UA_Int64 diff_ms = (newest - *prevHbTime) / UA_DATETIME_MSEC;
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                             "Heartbeat received after %lld ms", diff_ms);
             } else {
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                             "First heartbeat received");
             }
 
