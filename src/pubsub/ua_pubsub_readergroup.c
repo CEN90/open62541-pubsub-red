@@ -10,7 +10,11 @@
  */
 
 #include <open62541/server_pubsub.h>
+#include "open62541/types.h"
 #include "ua_pubsub_internal.h"
+#include <stdio.h>
+#include <open62541/plugin/log_stdout.h>
+
 
 #ifdef UA_ENABLE_PUBSUB /* conditional compilation */
 
@@ -308,6 +312,7 @@ UA_ReaderGroup_setPubSubState(UA_PubSubManager *psm, UA_ReaderGroup *rg,
         rg->head.state = targetState;
         UA_ReaderGroup_disconnect(rg);
         rg->hasReceived = false;
+        rg->sequenceNumber = 0;
         break;
 
         /* Enabled */
@@ -504,6 +509,25 @@ UA_ReaderGroup_decodeNetworkMessage(UA_PubSubManager *psm,
                               "PubSub receive. decoding headers failed");
         UA_NetworkMessage_clear(nm);
         return rv;
+    }
+
+    if(nm->groupHeader.sequenceNumberEnabled) {
+        const UA_UInt16 oldSeq = rg->sequenceNumber;
+        const UA_UInt16 newSeq = nm->groupHeader.sequenceNumber;
+
+        const UA_UInt16 acceptVal = (UA_UInt16)((newSeq - oldSeq - 1) & 0xFFFF);
+
+        if(acceptVal > 49152) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                           "Network message is discarded: invalid sequence number. OLD_Seq: %u, NEW_Seq: %u", oldSeq, newSeq);
+            UA_NetworkMessage_clear(nm);
+            return UA_STATUSCODE_BADOUTOFRANGE;
+        } else {
+            rg->sequenceNumber = newSeq;
+        }
+    }
+    else {
+        printf("Netwrok message sequence number is not enabled");
     }
 
     /* Find a matching reader. Otherwise skip for this ReaderGroup */

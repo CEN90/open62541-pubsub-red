@@ -11,10 +11,13 @@
  */
 
 #include "ua_pubsub_internal.h"
+#include <stdio.h>
 
 #ifdef UA_ENABLE_PUBSUB /* conditional compilation */
 
 #include "ua_pubsub_networkmessage.h"
+#include "open62541/plugin/log.h"
+#include <open62541/plugin/log_stdout.h>
 
 static UA_Boolean
 publisherIdIsMatching(UA_NetworkMessage *msg, UA_PublisherId *idB) {
@@ -461,6 +464,7 @@ UA_DataSetReader_setPubSubState(UA_PubSubManager *psm, UA_DataSetReader *dsr,
     case UA_PUBSUBSTATE_DISABLED:
     case UA_PUBSUBSTATE_ERROR:
         dsr->head.state = targetState;
+        dsr->lastRcvdDataSetMessageSequenceNr = 0;
         break;
 
         /* Enabled */
@@ -478,6 +482,7 @@ UA_DataSetReader_setPubSubState(UA_PubSubManager *psm, UA_DataSetReader *dsr,
 
     default:
         dsr->head.state = UA_PUBSUBSTATE_ERROR;
+        dsr->lastRcvdDataSetMessageSequenceNr = 0;
         res = UA_STATUSCODE_BADINTERNALERROR;
         errorReason = res;
         break;
@@ -506,7 +511,7 @@ UA_DataSetReader_setPubSubState(UA_PubSubManager *psm, UA_DataSetReader *dsr,
         server->config.pubSubConfig.
             stateChangeCallback(server, dsr->head.identifier,
                                 dsr->head.state, errorReason);
-                                
+
     return res;
 }
 
@@ -527,7 +532,7 @@ DataSetReader_createTargetVariables(UA_PubSubManager *psm, UA_DataSetReader *dsr
 
     UA_TargetVariablesDataType newVars;
     UA_TargetVariablesDataType tmp = {tvsSize, (UA_FieldTargetDataType*)(uintptr_t)tvs};
-    UA_StatusCode res = UA_TargetVariablesDataType_copy(&tmp, &newVars);   
+    UA_StatusCode res = UA_TargetVariablesDataType_copy(&tmp, &newVars);
     if(res != UA_STATUSCODE_GOOD)
         return res;
 
@@ -579,6 +584,24 @@ UA_DataSetReader_process(UA_PubSubManager *psm, UA_DataSetReader *dsr,
                            "DataSetMessage is discarded: message is not valid");
         return;
     }
+
+    if(msg->header.dataSetMessageSequenceNrEnabled)
+        {
+            const UA_UInt16 oldSeq = dsr->lastRcvdDataSetMessageSequenceNr;
+            const UA_UInt32 acceptVal = (msg->header.dataSetMessageSequenceNr - 1 - oldSeq) % 65536;
+            if(acceptVal > 49152)
+            {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                               "DataSetMessage is discarded: invalid sequence number. Old: %u, New: %u", oldSeq, msg->header.dataSetMessageSequenceNr);
+                return;
+            }
+            else
+            {
+                dsr->lastRcvdDataSetMessageSequenceNr = msg->header.dataSetMessageSequenceNr;
+            }
+        }else {
+            printf("DATASETMESSAGE SEQUENCE NUMBER IS NOT ENABLED");
+        }
 
     /* TODO: Check ConfigurationVersion */
     /* if(msg->header.configVersionMajorVersionEnabled) {

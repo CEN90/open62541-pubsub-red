@@ -1,6 +1,7 @@
 #include <open62541/pubsub_redundancy.h>
 #include <open62541/pubsub_heartbeat.h>
 #include <open62541/pubsub_sync.h>
+#include <open62541/pubsub_publisher.h>
 
 
 #include <open62541/plugin/log_stdout.h>
@@ -39,7 +40,7 @@ testPrimary(UA_Boolean const *isPrimary, State_s *state) {
         UA_LOG_INFO(
                     UA_Log_Stdout,
                     UA_LOGCATEGORY_USERLAND,
-                    "Sequence number: %d", state->state
+                    "STATE: %d", state->state
                 );
 
         sleep(1);
@@ -53,6 +54,7 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
 
     pthread_t heartbeatThread;
     pthread_t syncThread;
+    pthread_t publisherThread;
 
     HeartbeatConfig heartbeatConfig = {
         .ipAddress = config->ipAddress,
@@ -61,16 +63,19 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
         .isPrimary = isPrimary,
     };
 
-    cbstruct_s stateStruct = {
-        state,
-        isPrimary
-    };
+    cbstruct_s *stateStruct = malloc(sizeof(cbstruct_s));
+
+    stateStruct->data = state;
+    stateStruct->isPrimary = isPrimary;
+
 
     pthread_create(&heartbeatThread, NULL, initHeartBeat, &heartbeatConfig);
-    pthread_create(&syncThread, NULL, initSync, &stateStruct);
+    pthread_create(&syncThread, NULL, initSync, stateStruct);
+    pthread_create(&publisherThread, NULL, runPublisher, stateStruct);
 
-    testPrimary(isPrimary, state);
+    //testPrimary(stateStruct->isPrimary, stateStruct->data);
 
+    pthread_join(publisherThread, NULL);
     pthread_join(syncThread, NULL);
     pthread_join(heartbeatThread, NULL);
 

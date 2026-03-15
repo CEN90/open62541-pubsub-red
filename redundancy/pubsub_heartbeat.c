@@ -118,6 +118,7 @@ setupHeartbeatReceiver(int port, int *sockfd) {
 UA_StatusCode
 receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime prevHbTime) {
 
+    //return UA_STATUSCODE_GOOD;
     fd_set readfds;
     FD_ZERO(&readfds);
     FD_SET(sockfd, &readfds);

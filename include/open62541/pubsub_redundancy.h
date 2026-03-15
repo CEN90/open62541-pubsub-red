@@ -8,7 +8,7 @@
 #define MAGICNUMBER 42
 
 typedef struct {
-    UA_Int64 state;
+    UA_UInt16 state;
 } State_s;
 
 typedef struct {

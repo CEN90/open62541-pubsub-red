@@ -406,7 +406,7 @@ UA_PubSubDataSetWriter_generateKeyFrameMessage(UA_PubSubManager *psm,
     return UA_STATUSCODE_GOOD;
 }
 
-/* the input message is already initialized and that the method 
+/* the input message is already initialized and that the method
  * must not be called twice for the same message */
 static UA_StatusCode
 UA_PubSubDataSetWriter_generateDeltaFrameMessage(UA_PubSubManager *psm,

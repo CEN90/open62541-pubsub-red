@@ -602,7 +602,7 @@ encodeNetworkMessage(UA_WriterGroup *wg, PubSubEncodeCtx *ctx,
 }
 
 static void
-sendNetworkMessageBuffer(UA_PubSubManager *psm, UA_WriterGroup *wg, 
+sendNetworkMessageBuffer(UA_PubSubManager *psm, UA_WriterGroup *wg,
                          UA_PubSubConnection *connection, uintptr_t connectionId,
                          UA_ByteString *buffer) {
     UA_StatusCode res = connection->cm->
@@ -1096,7 +1096,7 @@ WriterGroupChannelCallback(UA_ConnectionManager *cm, uintptr_t connectionId,
 
     /* Connection open, set to operational if not already done */
     UA_WriterGroup_setPubSubState(psm, wg, wg->head.state);
-    
+
     /* Send-channels don't receive messages */
     unlockServer(server);
 }
@@ -1691,6 +1691,44 @@ UA_PubSubOffsetTable_clear(UA_PubSubOffsetTable *ot) {
     UA_ByteString_clear(&ot->networkMessage);
     UA_free(ot->offsets);
     memset(ot, 0, sizeof(UA_PubSubOffsetTable));
+}
+
+UA_StatusCode
+UA_Server_getWriterGroupSequenceNumber(UA_Server *server,
+                                       const UA_NodeId writerGroupId,
+                                       UA_UInt16 *sequenceNumber) {
+
+    if(!server || !sequenceNumber)
+        return UA_STATUSCODE_BADINVALIDARGUMENT;
+
+    UA_PubSubManager *psm = getPSM(server);
+    UA_WriterGroup *wg = (psm) ? UA_WriterGroup_find(psm, writerGroupId) : NULL;
+
+    if(!wg)
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    *sequenceNumber = wg->sequenceNumber;
+
+    return UA_STATUSCODE_GOOD;
+}
+
+UA_StatusCode
+UA_Server_setWriterGroupSequenceNumber(UA_Server *server,
+                                       const UA_NodeId writerGroupId,
+                                       UA_UInt16 sequenceNumber) {
+
+    if(!server)
+        return UA_STATUSCODE_BADINVALIDARGUMENT;
+
+    UA_PubSubManager *psm = getPSM(server);
+    UA_WriterGroup *wg = (psm) ? UA_WriterGroup_find(psm, writerGroupId) : NULL;
+
+    if(!wg)
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    wg->sequenceNumber = sequenceNumber;
+
+    return UA_STATUSCODE_GOOD;
 }
 
 #endif /* UA_ENABLE_PUBSUB */

@@ -17,6 +17,8 @@ static UA_NodeId connectionIdentifier,
 
 static UA_DataSetReaderConfig readerConfig;
 
+static UA_Boolean lastIsPrimary = UA_FALSE;
+
 
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
@@ -135,6 +137,17 @@ addDataSetWriter(UA_Server *server) {
     dataSetWriterConfig.name = UA_STRING("Demo DataSetWriter");
     dataSetWriterConfig.dataSetWriterId = DATASETWRITERID;
     dataSetWriterConfig.keyFrameCount = KEYFRAMECOUNT;
+
+    UA_UadpDataSetWriterMessageDataType dataSetWriterMessage;
+    UA_UadpDataSetWriterMessageDataType_init(&dataSetWriterMessage);
+
+    dataSetWriterMessage.dataSetMessageContentMask =
+        UA_UADPDATASETMESSAGECONTENTMASK_SEQUENCENUMBER;
+
+    UA_ExtensionObject_setValue(&dataSetWriterConfig.messageSettings,
+                                &dataSetWriterMessage,
+                                &UA_TYPES[UA_TYPES_UADPDATASETWRITERMESSAGEDATATYPE]);
+
     UA_Server_addDataSetWriter(server, writerGroupIdent, publishedDataSetIdent,
                                &dataSetWriterConfig, &dataSetWriterIdent);
 }
@@ -170,6 +183,16 @@ addDataSetReader(UA_Server *server) {
     readerConfig.publisherId.id.uint16 = publisherIdentifier;
     readerConfig.writerGroupId    = WRITERGROUDID;
     readerConfig.dataSetWriterId  = DATASETWRITERID;
+
+    UA_UadpDataSetReaderMessageDataType readerMessage;
+    UA_UadpDataSetReaderMessageDataType_init(&readerMessage);
+
+    readerMessage.dataSetMessageContentMask =
+        UA_UADPDATASETMESSAGECONTENTMASK_SEQUENCENUMBER;
+
+    UA_ExtensionObject_setValue(&readerConfig.messageSettings,
+                                &readerMessage,
+                                &UA_TYPES[UA_TYPES_UADPDATASETREADERMESSAGEDATATYPE]);
 
     /* Setting up Meta data configuration in DataSetReader */
     fillTestDataSetMetaData(&readerConfig.dataSetMetaData);
@@ -297,6 +320,28 @@ setSyncState(UA_Server *server, State_s *stateStruct) {
 static void
 onDemandSync(UA_Server *server, void *data){
     cbstruct_s *stateStruct = (cbstruct_s *)data;
+    UA_Boolean currentIsPrimary = *stateStruct->isPrimary;
+
+    if (currentIsPrimary && !lastIsPrimary) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                    "FAILOVER TRIGGERED: Taking over as PRIMARY");
+
+        /* Disable reader group (stop listening) */
+        UA_StatusCode retval = UA_Server_disableReaderGroup(server, readerGroupIdentifier);
+        if (retval != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                        "Failed to disable ReaderGroup: 0x%08x", retval);
+        }
+
+        /* Enable writer group (start publishing) */
+        retval = UA_Server_enableWriterGroup(server, writerGroupIdent);
+        if (retval != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                        "Failed to enable WriterGroup: 0x%08x", retval);
+        }
+
+        lastIsPrimary = currentIsPrimary;
+    }
 
     if (*stateStruct->isPrimary) { // we want to yeet state
         setSyncState(server, stateStruct->data);
@@ -312,7 +357,7 @@ setupPubSub(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
     UA_String transportProfile =
         UA_STRING("http://opcfoundation.org/UA-Profile/Transport/pubsub-udp-uadp");
     UA_NetworkAddressUrlDataType networkAddressUrl =
-        {UA_STRING_NULL , UA_STRING("opc.udp://224.0.0.22:4840/")};
+        {UA_STRING_NULL , UA_STRING("opc.udp://127.0.0.1:4840/")};
 
     runPubSub(&transportProfile, &networkAddressUrl, isPrimary, state);
 }
@@ -352,7 +397,22 @@ runPubSub(UA_String *transportProfile,
     addDataSetReader(server);
     addSubscribedVariables(server, readerIdentifier);
 
+    UA_Server_enableAllPubSubComponents(server);
+
     cbstruct_s stateStruct = {state, isPrimary};
+    lastIsPrimary = *isPrimary;
+
+    if (*isPrimary) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                    "Starting as primary: Enabling WriterGroup, disabling ReaderGroup");
+        UA_Server_enableWriterGroup(server, writerGroupIdent);
+        UA_Server_disableReaderGroup(server, readerGroupIdentifier);
+    } else {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                    "Starting as backup: Disabling WriterGroup, enabling ReaderGroup");
+        UA_Server_disableWriterGroup(server, writerGroupIdent);
+        UA_Server_enableReaderGroup(server, readerGroupIdentifier);
+    }
 
     // CB for publishing/reading state
     UA_Server_addRepeatedCallback(server,
@@ -361,7 +421,6 @@ runPubSub(UA_String *transportProfile,
                                 PUBLISHINGINTERVAL,
                                 NULL);
 
-    UA_Server_enableAllPubSubComponents(server);
     UA_Server_runUntilInterrupt(server);
 
     UA_Server_delete(server);

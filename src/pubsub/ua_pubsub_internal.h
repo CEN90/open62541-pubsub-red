@@ -26,7 +26,7 @@
 /**
  * PubSub State Machine
  * --------------------
- * 
+ *
  * The following table described the behaviour of components expected during
  * state changes and also the integration which is expected between the
  * components.
@@ -229,7 +229,7 @@ typedef struct UA_PubSubConnection {
     UA_Boolean json; /* Extracted from the TransportProfileUrl */
 
     /* Channels belonging to the PubSubConnection. Send channels belong to
-     * WriterGroups, recv channels belong to ReaderGroups. We only open channels 
+     * WriterGroups, recv channels belong to ReaderGroups. We only open channels
      * if there is at least one WriterGroup/ReaderGroup respectively.
      *
      * Some channels belong exclusively to just one WriterGroup/ReaderGroup that
@@ -435,6 +435,8 @@ struct UA_DataSetReader {
 
     /* MessageReceiveTimeout handling */
     UA_UInt64 msgRcvTimeoutTimerId;
+
+    UA_UInt16 lastRcvdDataSetMessageSequenceNr;
 };
 
 UA_DataSetReader *
@@ -487,7 +489,7 @@ struct UA_ReaderGroup {
 
     UA_Boolean hasReceived; /* Received a message since the last _connect */
 
-    /* The ConnectionManager pointer is stored in the Connection. The channels 
+    /* The ConnectionManager pointer is stored in the Connection. The channels
      * are either stored here or in the Connection, but never both. */
     UA_PubSubConnection *linkedConnection;
     uintptr_t recvChannels[UA_PUBSUB_MAXCHANNELS];
@@ -500,6 +502,7 @@ struct UA_ReaderGroup {
 #ifdef UA_ENABLE_PUBSUB_SKS
     UA_PubSubKeyStorage *keyStorage;
 #endif
+    UA_UInt16 sequenceNumber;
 };
 
 UA_StatusCode

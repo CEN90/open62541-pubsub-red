@@ -580,6 +580,18 @@ typedef struct {
     UA_String securityGroupId;
 } UA_WriterGroupConfig;
 
+
+// Redundancy helper functions get/set sequence number
+UA_StatusCode
+UA_Server_getWriterGroupSequenceNumber(UA_Server *server,
+                                       const UA_NodeId writerGroupId,
+                                       UA_UInt16 *sequenceNumber);
+
+UA_StatusCode
+UA_Server_setWriterGroupSequenceNumber(UA_Server *server,
+                                       const UA_NodeId writerGroupId,
+                                       UA_UInt16 sequenceNumber);
+
 void UA_EXPORT
 UA_WriterGroupConfig_clear(UA_WriterGroupConfig *writerGroupConfig);
 
