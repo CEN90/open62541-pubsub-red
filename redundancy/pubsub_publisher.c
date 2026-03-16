@@ -1,54 +1,51 @@
-#include "open62541/plugin/log.h"
-#include "open62541/types.h"
 #include "open62541/pubsub_publisher.h"
 
 #include <open62541/plugin/log_stdout.h>
-#include <open62541/server.h>
-#include <open62541/server_pubsub.h>
-#include <open62541/server_config_default.h>
 #include <open62541/pubsub_sync.h>
+#include <open62541/server.h>
+#include <open62541/server_config_default.h>
+#include <open62541/server_pubsub.h>
 
-static UA_NodeId connectionIdentifier,
-                 publishedDataSetIdent,
-                 writerGroupIdent,
-                 dataSetWriterIdent;
+#include "open62541/plugin/log.h"
+#include "open62541/types.h"
 
+static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
+    dataSetWriterIdent;
 
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
-                    UA_NetworkAddressUrlDataType *networkAddressUrl){
+                    UA_NetworkAddressUrlDataType *networkAddressUrl) {
     /* Details about the connection configuration and handling are located
-        * in the pubsub connection tutorial */
+     * in the pubsub connection tutorial */
     UA_PubSubConnectionConfig connectionConfig;
     memset(&connectionConfig, 0, sizeof(connectionConfig));
     connectionConfig.name = UA_STRING("UADP Connection 2");
     connectionConfig.transportProfileUri = *transportProfile;
     UA_Variant_setScalar(&connectionConfig.address, networkAddressUrl,
-                            &UA_TYPES[UA_TYPES_NETWORKADDRESSURLDATATYPE]);
+                         &UA_TYPES[UA_TYPES_NETWORKADDRESSURLDATATYPE]);
     /* Changed to static publisherId from random generation to identify
-        * the publisher on Subscriber side */
+     * the publisher on Subscriber side */
     connectionConfig.publisherId.idType = UA_PUBLISHERIDTYPE_UINT16;
     connectionConfig.publisherId.id.uint16 = PUBLISHER_PUBLISHERID;
     UA_Server_addPubSubConnection(server, &connectionConfig, &connectionIdentifier);
 }
 
-
 /****************************************************************************************
-* Publisher functions
-****************************************************************************************
-*/
-
+ * Publisher functions
+ ****************************************************************************************
+ */
 
 static void
 addPublishedDataSet(UA_Server *server) {
     /* The PublishedDataSetConfig contains all necessary public
-    * information for the creation of a new PublishedDataSet */
+     * information for the creation of a new PublishedDataSet */
     UA_PublishedDataSetConfig publishedDataSetConfig;
     memset(&publishedDataSetConfig, 0, sizeof(UA_PublishedDataSetConfig));
     publishedDataSetConfig.publishedDataSetType = UA_PUBSUB_DATASET_PUBLISHEDITEMS;
     publishedDataSetConfig.name = UA_STRING("Demo PDS");
     /* Create new PublishedDataSet based on the PublishedDataSetConfig. */
-    UA_Server_addPublishedDataSet(server, &publishedDataSetConfig, &publishedDataSetIdent);
+    UA_Server_addPublishedDataSet(server, &publishedDataSetConfig,
+                                  &publishedDataSetIdent);
 }
 
 static UA_NodeId
@@ -63,14 +60,13 @@ addStateVariable(UA_Server *server, UA_Int64 *fakeValue) {
     attr.value = value;
 
     UA_NodeId stateNodeId = UA_NODEID_STRING(1, "SensorValue");
-    UA_Server_addVariableNode(server, stateNodeId,
-        UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
-        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
-        UA_QUALIFIEDNAME(1, "SensorValue"),
-        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
-        attr, NULL, NULL);
+    UA_Server_addVariableNode(
+        server, stateNodeId, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES), UA_QUALIFIEDNAME(1, "SensorValue"),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), attr, NULL, NULL);
 
-    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Value %d", *(int64_t*)value.data);
+    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Value %d",
+                 *(int64_t *)value.data);
     return stateNodeId;
 }
 
@@ -82,12 +78,13 @@ addDataField(UA_Server *server, UA_Int64 *fakeValue) {
     dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
     dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("SensorValue");
     dataSetFieldConfig.field.variable.promotedField = UA_FALSE;
-    dataSetFieldConfig.field.variable.publishParameters.publishedVariable = addStateVariable(server, fakeValue);
-    dataSetFieldConfig.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
-    UA_Server_addDataSetField(server, publishedDataSetIdent,
-                              &dataSetFieldConfig, &dataSetFieldIdent);
+    dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
+        addStateVariable(server, fakeValue);
+    dataSetFieldConfig.field.variable.publishParameters.attributeId =
+        UA_ATTRIBUTEID_VALUE;
+    UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldConfig,
+                              &dataSetFieldIdent);
 }
-
 
 static void
 addWriterGroup(UA_Server *server) {
@@ -119,7 +116,8 @@ addWriterGroup(UA_Server *server) {
     UA_ExtensionObject_setValue(&writerGroupConfig.messageSettings, &writerGroupMessage,
                                 &UA_TYPES[UA_TYPES_UADPWRITERGROUPMESSAGEDATATYPE]);
 
-    UA_Server_addWriterGroup(server, connectionIdentifier, &writerGroupConfig, &writerGroupIdent);
+    UA_Server_addWriterGroup(server, connectionIdentifier, &writerGroupConfig,
+                             &writerGroupIdent);
 }
 
 static void
@@ -146,7 +144,6 @@ addDataSetWriter(UA_Server *server) {
                                &dataSetWriterConfig, &dataSetWriterIdent);
 }
 
-
 static void
 updateFakeValue(UA_Server *server, void *data) {
     UA_Int64 *fakeValue = (UA_Int64 *)data;
@@ -160,9 +157,8 @@ updateFakeValue(UA_Server *server, void *data) {
     UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
 }
 
-
-
-void *runPublisher(void *data){
+void *
+runPublisher(void *data) {
     cbstruct_s *stateStruct = (cbstruct_s *)data;
     UA_Boolean *isPrimary = stateStruct->isPrimary;
     State_s *state = stateStruct->data;
@@ -175,12 +171,12 @@ void *runPublisher(void *data){
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *config = UA_Server_getConfig(server);
     UA_ServerConfig_setDefault(config);
-    UA_Int64 fakeValue = 0;
+    UA_Int64 fakeValue = 62541;
 
     UA_String transportProfile =
         UA_STRING("http://opcfoundation.org/UA-Profile/Transport/pubsub-udp-uadp");
-    UA_NetworkAddressUrlDataType networkAddressUrl =
-        {UA_STRING_NULL , UA_STRING("opc.udp://224.0.0.22:4842/")};
+    UA_NetworkAddressUrlDataType networkAddressUrl = {
+        UA_STRING_NULL, UA_STRING("opc.udp://224.0.0.22:4842/")};
 
     // common
     addPubSubConnection(server, &transportProfile, &networkAddressUrl);
@@ -191,14 +187,10 @@ void *runPublisher(void *data){
     addWriterGroup(server);
     addDataSetWriter(server);
 
-    UA_Server_addRepeatedCallback(server,
-                                updateFakeValue,
-                                &fakeValue,
-                                PUBLISHER_PUBLISHINGINTERVAL,
-                                NULL);
+    UA_Server_addRepeatedCallback(server, updateFakeValue, &fakeValue,
+                                  PUBLISHER_PUBLISHINGINTERVAL, NULL);
 
     UA_Server_enableAllPubSubComponents(server);
-
 
     while(true) {
 
@@ -206,22 +198,23 @@ void *runPublisher(void *data){
 
             if(*isPrimary) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                            "Becoming PRIMARY -> start publishing %d \n", *isPrimary);
+                             "Becoming PRIMARY -> start publishing %d \n", *isPrimary);
 
-                UA_StatusCode rv = UA_Server_setWriterGroupSequenceNumber(server,
-                                                                                  writerGroupIdent,
-                                                                                  state->state);
+                UA_StatusCode rv = UA_Server_setWriterGroupSequenceNumber(
+                    server, writerGroupIdent, state->state);
                 if(rv == UA_STATUSCODE_GOOD) {
                     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                                 "WriterGroup sequence number set to %u", state->state);
                 } else {
-                    UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                                    "Failed to set WriterGroup sequence number, StatusCode: 0x%08x", rv);
+                    UA_LOG_WARNING(
+                        UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                        "Failed to set WriterGroup sequence number, StatusCode: 0x%08x",
+                        rv);
                 }
                 UA_Server_setWriterGroupOperational(server, writerGroupIdent);
             } else {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                            "Becoming BACKUP -> stop publishing");
+                             "Becoming BACKUP -> stop publishing");
 
                 UA_Server_setWriterGroupDisabled(server, writerGroupIdent);
             }
@@ -231,16 +224,15 @@ void *runPublisher(void *data){
 
         if(*isPrimary) {
             UA_UInt16 seq = 0;
-            UA_StatusCode rv = UA_Server_getWriterGroupSequenceNumber(server,
-                                                                        writerGroupIdent,
-                                                                        &seq);
+            UA_StatusCode rv =
+                UA_Server_getWriterGroupSequenceNumber(server, writerGroupIdent, &seq);
             if(rv == UA_STATUSCODE_GOOD) {
                 state->state = seq;
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                             "Current sequence number: %u", seq);
             } else {
                 UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                                "Failed to get sequence number, StatusCode: 0x%08x", rv);
+                               "Failed to get sequence number, StatusCode: 0x%08x", rv);
             }
         }
 
