@@ -152,8 +152,7 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     int nfds = epoll_wait(epoll_fd, events, 1, 0);  // 0 ms timeout for non-blocking
 
     if(nfds <= 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
-        return UA_STATUSCODE_BAD;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
     }
 
     if(events[0].events & EPOLLIN) {
@@ -178,9 +177,9 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
 
         if(newest != 0) {
             if(*prevHbTime != 0) {
-                UA_Int64 diff_ms = (newest - *prevHbTime) / UA_DATETIME_MSEC;
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                            "Heartbeat received after %lld ms", diff_ms);
+                // UA_Int64 diff_ms = (newest - *prevHbTime) / UA_DATETIME_MSEC;
+                // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                //             "Heartbeat received after %lld ms", diff_ms);
             } else {
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                             "First heartbeat received");

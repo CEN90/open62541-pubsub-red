@@ -14,8 +14,6 @@ static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
 static UA_DataSetReaderConfig readerConfig;
 static UA_Boolean lastIsPrimary = UA_FALSE;
 
-static UA_Boolean lastIsPrimary = UA_FALSE;
-
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
                     UA_NetworkAddressUrlDataType *networkAddressUrl) {
@@ -286,16 +284,16 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
     UA_Variant_init(&value);
 
     UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "state"), &value);
-    
+
     if (retval != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                      "Failed to read state: 0x%08x", retval);
         UA_Variant_clear(&value);
         return;
     }
 
     if (value.data == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                      "state has no data");
         UA_Variant_clear(&value);
         return;
@@ -306,10 +304,10 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
         stateStruct->state = state;
         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state read: %lld", state);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                      "state is not an Int64 type");
     }
-    
+
     UA_Variant_clear(&value);
 }
 
@@ -330,23 +328,23 @@ onDemandSync(UA_Server *server, void *data) {
 
     /* Check for role change: Backup -> Primary failover */
     if (currentIsPrimary && !lastIsPrimary) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                     "FAILOVER TRIGGERED: Taking over as PRIMARY");
-        
+
         /* Disable reader group (stop listening) */
         UA_StatusCode retval = UA_Server_disableReaderGroup(server, readerGroupIdentifier);
         if (retval != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                         "Failed to disable ReaderGroup: 0x%08x", retval);
         }
-        
+
         /* Enable writer group (start publishing) */
         retval = UA_Server_enableWriterGroup(server, writerGroupIdent);
         if (retval != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                         "Failed to enable WriterGroup: 0x%08x", retval);
         }
-        
+
         lastIsPrimary = currentIsPrimary;
     }
 
@@ -408,14 +406,14 @@ runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddr
 
     cbstruct_s stateStruct = {state, isPrimary};
     lastIsPrimary = *isPrimary;
-    
+
     if (*isPrimary) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                     "Starting as primary: Enabling WriterGroup, disabling ReaderGroup");
         UA_Server_enableWriterGroup(server, writerGroupIdent);
         UA_Server_disableReaderGroup(server, readerGroupIdentifier);
     } else {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                     "Starting as backup: Disabling WriterGroup, enabling ReaderGroup");
         UA_Server_disableWriterGroup(server, writerGroupIdent);
         UA_Server_enableReaderGroup(server, readerGroupIdentifier);
