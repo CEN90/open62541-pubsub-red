@@ -6,6 +6,7 @@
 #include <open62541/types.h>
 
 #define MAGICNUMBER 42
+#define IPADDRLEN 16
 
 typedef struct {
     UA_UInt16 state;
