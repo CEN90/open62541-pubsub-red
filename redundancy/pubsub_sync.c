@@ -195,7 +195,8 @@ addDataSetReader(UA_Server *server) {
 }
 
 static void
-addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId, UA_NodeId *stateNodeId) {
+addSubscribedVariables(UA_Server *server, UA_NodeId dataSetReaderId,
+                       UA_NodeId *stateNodeId) {
     UA_NodeId folderId;
     UA_String folderName = readerConfig.dataSetMetaData.name;
     UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
@@ -283,18 +284,18 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "state"), &value);
+    UA_StatusCode retval =
+        UA_Server_readValue(server, UA_NODEID_STRING(1, "state"), &value);
 
-    if (retval != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                     "Failed to read state: 0x%08x", retval);
+    if(retval != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Failed to read state: 0x%08x",
+                     retval);
         UA_Variant_clear(&value);
         return;
     }
 
-    if (value.data == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                     "state has no data");
+    if(value.data == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "state has no data");
         UA_Variant_clear(&value);
         return;
     }
@@ -302,10 +303,9 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
     if(UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_INT16])) {
         int16_t state = *(int16_t *)value.data;
         stateStruct->state = state;
-        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state read: %lld", state);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state read: %lld", state);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                     "state is not an Int64 type");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "state is not an Int16 type");
     }
 
     UA_Variant_clear(&value);
@@ -327,28 +327,29 @@ onDemandSync(UA_Server *server, void *data) {
     UA_Boolean currentIsPrimary = *stateStruct->isPrimary;
 
     /* Check for role change: Backup -> Primary failover */
-    if (currentIsPrimary && !lastIsPrimary) {
+    if(currentIsPrimary && !lastIsPrimary) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                     "FAILOVER TRIGGERED: Taking over as PRIMARY");
 
         /* Disable reader group (stop listening) */
-        UA_StatusCode retval = UA_Server_disableReaderGroup(server, readerGroupIdentifier);
-        if (retval != UA_STATUSCODE_GOOD) {
+        UA_StatusCode retval =
+            UA_Server_disableReaderGroup(server, readerGroupIdentifier);
+        if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                        "Failed to disable ReaderGroup: 0x%08x", retval);
+                         "Failed to disable ReaderGroup: 0x%08x", retval);
         }
 
         /* Enable writer group (start publishing) */
         retval = UA_Server_enableWriterGroup(server, writerGroupIdent);
-        if (retval != UA_STATUSCODE_GOOD) {
+        if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                        "Failed to enable WriterGroup: 0x%08x", retval);
+                         "Failed to enable WriterGroup: 0x%08x", retval);
         }
 
         lastIsPrimary = currentIsPrimary;
     }
 
-    if (currentIsPrimary) {
+    if(currentIsPrimary) {
         /* PRIMARY: Publish state */
         setSyncState(server, stateStruct->data);
         UA_Server_WriterGroup_publish(server, writerGroupIdent);
@@ -407,7 +408,7 @@ runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddr
     cbstruct_s stateStruct = {state, isPrimary};
     lastIsPrimary = *isPrimary;
 
-    if (*isPrimary) {
+    if(*isPrimary) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                     "Starting as primary: Enabling WriterGroup, disabling ReaderGroup");
         UA_Server_enableWriterGroup(server, writerGroupIdent);

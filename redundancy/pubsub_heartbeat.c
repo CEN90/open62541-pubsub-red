@@ -149,10 +149,11 @@ setupHeartbeatReceiver(int port, int *sockfd) {
 UA_StatusCode
 receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     struct epoll_event events[1];
-    int nfds = epoll_wait(epoll_fd, events, 1, HEARTBEATSLACK);  // 0 ms timeout for non-blocking
+    int nfds =
+        epoll_wait(epoll_fd, events, 1, HEARTBEATSLACK);  // 0 ms timeout for non-blocking
 
     if(nfds <= 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
+        // UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
     }
 
     if(events[0].events & EPOLLIN) {
@@ -182,7 +183,7 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
                 //             "Heartbeat received after %lld ms", diff_ms);
             } else {
                 UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                            "First heartbeat received");
+                             "First heartbeat received");
             }
 
             *prevHbTime = newest;  // update once per epoll wakeup
