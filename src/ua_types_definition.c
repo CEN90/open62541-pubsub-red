@@ -179,10 +179,12 @@ UA_DataType_fromStructureDescription(UA_DataType *type,
     type->membersSize = (UA_Byte)sd->fieldsSize;
 
     /* Try to get pointerFree and overlayable handling shortcuts.
-     * Verified for each member and end-padding. */
+     * Adjusted later for each member and end-padding. */
     if(sd->structureType == UA_STRUCTURETYPE_STRUCTURE) {
         type->pointerFree = true;
         type->overlayable = true;
+    } else if(sd->structureType == UA_STRUCTURETYPE_UNION) {
+        type->pointerFree = true;
     }
 
     /* Populate the members array */
@@ -211,9 +213,9 @@ UA_DataType_fromStructureDescription(UA_DataType *type,
 #endif
 
         /* Memory size and padding for the scalar case */
-        UA_Byte alignment = type_alignment(dtm->memberType);
+        UA_Byte talignment = type_alignment(dtm->memberType);
         size_t memSize = dtm->memberType->memSize;
-        dtm->padding = PADDING(type->memSize, alignment);
+        dtm->padding = PADDING(type->memSize, talignment);
 
         /* Handle valuerank and array dimensions */
         if(sf->valueRank == 1) {
@@ -253,7 +255,6 @@ UA_DataType_fromStructureDescription(UA_DataType *type,
                 PADDING(sizeof(UA_UInt32), offsetof(struct _pad_size_t, x)) :
                 PADDING(sizeof(UA_UInt32), type_alignment(dtm->memberType)));
             dtm->padding = sizeof(UA_UInt32) + fieldPadding;
-            UA_assert(!type->pointerFree); /* Set above */
         }
 
         /* Adjust the type size for the latest member */
@@ -390,11 +391,13 @@ UA_DataType_fromEnumDescription(UA_DataType *type,
         UA_DataTypeMember *dtm = &type->members[i];
         const UA_EnumField *ef = &descr->enumDefinition.fields[i];
         dtm->memberType = (const UA_DataType*)(uintptr_t)ef->value;
+#ifdef UA_ENABLE_TYPEDESCRIPTION
         dtm->memberName = (char*)UA_malloc(ef->name.length + 1);
         UA_CHECK(dtm->memberName != NULL,
                  UA_DataType_clear(type); return UA_STATUSCODE_BADOUTOFMEMORY);
         memcpy((char*)(uintptr_t)dtm->memberName, ef->name.data, ef->name.length);
         *(char*)(uintptr_t)&dtm->memberName[ef->name.length] = '\0';
+#endif
     }
 
     return UA_STATUSCODE_GOOD;

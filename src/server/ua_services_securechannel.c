@@ -54,15 +54,13 @@ processOPN_AsymHeader(void *application, UA_SecureChannel *channel,
     if(!securityPolicy)
         return UA_STATUSCODE_BADSECURITYPOLICYREJECTED;
 
-    /* TODO: Check the URI in the certificate */
-
     /* Verify the client certificate (chain).
      * Here we don't have the ApplicationDescription.
      * This check follows in the CreateSession service. */
     if(asymHeader->senderCertificate.length > 0) {
         UA_StatusCode res =
-            validateCertificate(server, &sc->secureChannelPKI, channel,
-                                NULL, NULL, asymHeader->senderCertificate);
+            validateCertificate(server, &sc->secureChannelPKI, channel, NULL,
+                                "OpenSecureChannel", NULL, asymHeader->senderCertificate);
         UA_CHECK_STATUS(res, return res);
     }
 
@@ -79,10 +77,10 @@ processOPN_AsymHeader(void *application, UA_SecureChannel *channel,
     return UA_SecureChannel_setSecurityPolicy(channel, securityPolicy, &appInstCert);
 }
 
-void
-Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
-                          UA_OpenSecureChannelRequest *request,
-                          UA_OpenSecureChannelResponse *response) {
+static void
+Service_OpenSecureChannel_inner(UA_Server *server, UA_SecureChannel *channel,
+                                UA_OpenSecureChannelRequest *request,
+                                UA_OpenSecureChannelResponse *response) {
     UA_ServerConfig *sc = &server->config;
     UA_EventLoop *el = server->config.eventLoop;
     const UA_SecurityPolicy *sp = channel->securityPolicy;
@@ -93,7 +91,7 @@ Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
         /* We must expect an OPN handshake */
         if(channel->state != UA_SECURECHANNELSTATE_ACK_SENT) {
             UA_LOG_ERROR_CHANNEL(sc->logging, channel,
-                                 "OpenSecureChannel | Cannot open "
+                                 "OpenSecureChannel: Cannot open "
                                  "already open or closed channel");
             response->responseHeader.serviceResult = UA_STATUSCODE_BADINTERNALERROR;
             return;
@@ -110,7 +108,7 @@ Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
             UA_SecureChannel_setSecurityMode(channel, request->securityMode);
         if(response->responseHeader.serviceResult != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR_CHANNEL(sc->logging, channel,
-                                 "OpenSecureChannel | Client tries mismatching "
+                                 "OpenSecureChannel: Client tries mismatching "
                                  "SecurityMode %s for SecurityPolicy %S",
                                  securityModeNames[request->securityMode],
                                  sp->policyUri);
@@ -124,7 +122,7 @@ Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
         /* The channel must be open to be renewed */
         if(channel->state != UA_SECURECHANNELSTATE_OPEN) {
             UA_LOG_ERROR_CHANNEL(sc->logging, channel,
-                                 "OpenSecureChannel | The client called renew on "
+                                 "OpenSecureChannel: The client called renew on "
                                  "channel which is not open");
             response->responseHeader.serviceResult = UA_STATUSCODE_BADINTERNALERROR;
             return;
@@ -134,7 +132,7 @@ Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
         if(channel->securityMode != UA_MESSAGESECURITYMODE_NONE &&
            UA_ByteString_equal(&channel->remoteNonce, &request->clientNonce)) {
             UA_LOG_ERROR_CHANNEL(sc->logging, channel,
-                                 "OpenSecureChannel | The client called renew "
+                                 "OpenSecureChannel: The client called renew "
                                  "reusing the previous nonce");
             response->responseHeader.serviceResult =
                 UA_STATUSCODE_BADSECURITYCHECKSFAILED;
@@ -146,7 +144,7 @@ Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
     /* Unknown request type */
     default:
         UA_LOG_ERROR_CHANNEL(sc->logging, channel,
-                             "OpenSecureChannel | Unknown request type");
+                             "OpenSecureChannel: Unknown request type");
         response->responseHeader.serviceResult = UA_STATUSCODE_BADINTERNALERROR;
         return;
     }
@@ -171,7 +169,7 @@ Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
     response->responseHeader.serviceResult = UA_SecureChannel_generateLocalNonce(channel);
     if(response->responseHeader.serviceResult != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR_CHANNEL(sc->logging, channel,
-                             "OpenSecureChannel | Cannot generate the local nonce");
+                             "OpenSecureChannel: Cannot generate the local nonce");
         return;
     }
 
@@ -191,7 +189,7 @@ Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
     /* Success */
     if(request->requestType == UA_SECURITYTOKENREQUESTTYPE_ISSUE) {
         UA_LOG_INFO_CHANNEL(sc->logging, channel,
-                            "SecureChannel opened with SecurityMode %s for "
+                            "OpenSecureChannel: Channel opened with SecurityMode %s for "
                             "SecurityPolicy %S and a revised lifetime of %.2fs",
                             securityModeNames[channel->securityMode],
                             channel->securityPolicy->policyUri,
@@ -202,15 +200,35 @@ Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
                             UA_APPLICATIONNOTIFICATIONTYPE_SECURECHANNEL_OPENED);
     } else {
         UA_LOG_INFO_CHANNEL(sc->logging, channel,
-                            "SecureChannel renewed with a revised lifetime of %.2fs",
+                            "OpenSecureChannel: Channel renewed with a revised "
+                            "lifetime of %.2fs",
                             (UA_Float)response->securityToken.revisedLifetime / 1000);
     }
+}
+
+void
+Service_OpenSecureChannel(UA_Server *server, UA_SecureChannel *channel,
+                          UA_OpenSecureChannelRequest *request,
+                          UA_OpenSecureChannelResponse *response) {
+    /* Call the main OpenSecureChannel implementation */
+    Service_OpenSecureChannel_inner(server, channel, request, response);
+
+#ifdef UA_ENABLE_AUDITING
+    auditOpenSecureChannelEvent(server, channel, request, response);
+#endif
 }
 
 /* The server does not send a CloseSecureChannel response */
 void
 Service_CloseSecureChannel(UA_Server *server, UA_SecureChannel *channel) {
-    UA_SecureChannel_shutdown(channel, UA_SHUTDOWNREASON_CLOSE);
+    if(UA_SecureChannel_isConnected(channel)) {
+        /* Shutdown - takes effect in the next EventLoop iteration */
+        UA_SecureChannel_shutdown(channel, UA_SHUTDOWNREASON_CLOSE);
+
+#ifdef UA_ENABLE_AUDITING
+        auditCloseSecureChannelEvent(server, channel);
+#endif
+    }
 }
 
 void
