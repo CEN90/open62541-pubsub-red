@@ -10,10 +10,10 @@ else()
 endif()
 
 if(ZEPHYR_BASE)
-    if(NOT CONFIG_OPEN62541)
-        return()
-    endif()
-    include(arch/zephyr/zephyr.cmake)
+  if(NOT CONFIG_OPEN62541)
+    return()
+  endif()
+  include(arch/zephyr/zephyr.cmake)
 endif()
 
 # set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -43,8 +43,8 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # overwritten with more detailed information if git is available.
 set(OPEN62541_VER_MAJOR 1)
 set(OPEN62541_VER_MINOR 5)
-set(OPEN62541_VER_PATCH 0)
-set(OPEN62541_VER_LABEL "-rc2") # like "-rc1" or "-g4538abcd" or "-g4538abcd-dirty"
+set(OPEN62541_VER_PATCH 2)
+set(OPEN62541_VER_LABEL "") # like "-rc1" or "-g4538abcd" or "-g4538abcd-dirty"
 set(OPEN62541_VER_COMMIT "unknown-commit")
 
 # Overwrite the version information based on git if available and we are the main cmake project.
@@ -107,7 +107,7 @@ endif()
 string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER_CASE)
 
 option(UA_ENABLE_AMALGAMATION "Concatenate the library to a single file open62541.h/.c" OFF)
-option(BUILD_SHARED_LIBS "Enable building of shared libraries (dll/so)" ON)
+option(BUILD_SHARED_LIBS "Enable building of shared libraries (dll/so)" OFF)
 set(UA_LOGLEVEL 100 CACHE STRING "Minimal level for logs (in addition to the log plugin settings) (100=TRACE, 200=DEBUG, 300=INFO, 400=WARNING, 500=ERROR, 600=FATAL)")
 option(UA_ENABLE_DIAGNOSTICS "Enable diagnostics information exposed by the server" ON)
 option(UA_ENABLE_METHODCALLS "Enable the Method service set" ON)
@@ -121,17 +121,30 @@ option(UA_ENABLE_XML_ENCODING "Enable XML encoding" ON)
 option(UA_ENABLE_NODESETLOADER "Enable nodesetLoader public API" OFF)
 option(UA_ENABLE_GDS_PUSHMANAGEMENT "Enable GDS pushManagement support" OFF)
 option(UA_ENABLE_DATATYPES_ALL "Generate all datatypes for namespace zero (uses more binary space)" ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+option(UA_ENABLE_RBAC "Enable Role-Based Access Control (EXPERIMENTAL - NOT FOR PRODUCTION)" OFF)
 
+if(UA_ENABLE_RBAC)
+    message(WARNING "UA_ENABLE_RBAC is EXPERIMENTAL and NOT RECOMMENDED FOR PRODUCTION USE. "
+                    "The RBAC implementation is under active development and the API may change. "
+                    "Use only for testing and development purposes.")
+endif()
 
 if(UA_INFORMATION_MODEL_AUTOLOAD AND NOT UA_BUILD_FUZZING)
     set(UA_ENABLE_NODESET_INJECTOR ON)
+
+    # Detect whether any loaded companion spec requires the RoleSet node
+    set(UA_NODESET_INJECTOR_NEEDS_ROLESET OFF)
+    foreach(_model ${UA_INFORMATION_MODEL_AUTOLOAD})
+        if(_model STREQUAL "GDS" OR _model STREQUAL "Onboarding" OR _model STREQUAL "UAFX-Data")
+            set(UA_NODESET_INJECTOR_NEEDS_ROLESET ON)
+        endif()
+    endforeach()
 endif()
 
 set(MULTITHREADING_DEFAULT 0)
 if(WIN32 OR UNIX)
-    # Enable multithreading by default on Windows and POSIX-like (Unix) systems
-    set(MULTITHREADING_DEFAULT 100)
+  # Enable multithreading by default on Windows and POSIX-like (Unix) systems
+  set(MULTITHREADING_DEFAULT 100)
 endif()
 set(UA_MULTITHREADING ${MULTITHREADING_DEFAULT} CACHE STRING
     "Multithreading support (<100: No multithreading support, >=100: Thread-safety enabled (internal mutexes)")
@@ -141,6 +154,9 @@ mark_as_advanced(UA_ENABLE_SUBSCRIPTIONS_ALARMS_CONDITIONS)
 
 option(UA_ENABLE_NODEMANAGEMENT "Enable dynamic addition and removal of nodes at runtime" ON)
 mark_as_advanced(UA_ENABLE_NODEMANAGEMENT)
+
+option(UA_ENABLE_AUDITING "Enable generation of audit events in servers" ON)
+mark_as_advanced(UA_ENABLE_AUDITING)
 
 option(UA_ENABLE_INLINABLE_EXPORT "Export 'static inline' methods as regular API" OFF)
 mark_as_advanced(UA_ENABLE_INLINABLE_EXPORT)
@@ -164,11 +180,11 @@ if(UA_ENABLE_DISCOVERY_MULTICAST STREQUAL "OFF" OR ${_tmp} GREATER -1)
     elseif(UA_ENABLE_DISCOVERY_MULTICAST STREQUAL "AVAHI")
         set(UA_ENABLE_DISCOVERY_MULTICAST_AVAHI ON)
     endif()
-    # Only for backward compatability
+# Only for backward compatability
 elseif(UA_ENABLE_DISCOVERY_MULTICAST OR UA_ENABLE_DISCOVERY_MULTICAST STREQUAL "ON")
     message(DEPRECATION "Set UA_ENABLE_DISCOVERY_MULTICAST to the desired mDNS library." )
     if(NOT UA_ENABLE_DISCOVERY_MULTICAST_AVAHI)
-        set(UA_ENABLE_DISCOVERY_MULTICAST_MDNSD ON)
+    set(UA_ENABLE_DISCOVERY_MULTICAST_MDNSD ON)
     endif()
 else()
     message(DEPRECATION "Set UA_ENABLE_DISCOVERY_MULTICAST to the desired mDNS library." )
@@ -203,11 +219,11 @@ if(UA_ENABLE_ENCRYPTION STREQUAL "OFF" OR ${_tmp} GREATER -1)
     elseif(UA_ENABLE_ENCRYPTION STREQUAL "LIBRESSL")
         set(UA_ENABLE_ENCRYPTION_LIBRESSL ON)
     endif()
-    # Only for backward compatability
+# Only for backward compatability
 elseif(UA_ENABLE_ENCRYPTION)
     message(DEPRECATION "Set UA_ENABLE_ENCRYPTION to the desired encryption library." )
     if(NOT UA_ENABLE_ENCRYPTION_OPENSSL)
-        set(UA_ENABLE_ENCRYPTION_MBEDTLS ON)
+    set(UA_ENABLE_ENCRYPTION_MBEDTLS ON)
     endif()
 else()
     message(DEPRECATION "Set UA_ENABLE_ENCRYPTION to the desired encryption library." )
@@ -427,7 +443,7 @@ if(CMAKE_BUILD_TYPE MATCHES DEBUG)
 endif()
 
 # Build Targets
-option(UA_BUILD_EXAMPLES "Build example servers and clients" ON)
+option(UA_BUILD_EXAMPLES "Build example servers and clients" OFF)
 option(UA_BUILD_TOOLS "Build OPC UA shell tools" OFF)
 option(UA_BUILD_UNIT_TESTS "Build the unit tests" OFF)
 option(UA_BUILD_FUZZING "Build the fuzzing executables" OFF)
@@ -460,10 +476,10 @@ endif()
 # Building shared libs (dll, so). This option is written into ua_config.h.
 set(UA_DYNAMIC_LINKING OFF)
 if(BUILD_SHARED_LIBS)
-    set(UA_DYNAMIC_LINKING ON)
-    if(UA_ENABLE_DISCOVERY_MULTICAST)
-        set(MDNSD_DYNAMIC_LINKING ON)
-    endif()
+  set(UA_DYNAMIC_LINKING ON)
+  if(UA_ENABLE_DISCOVERY_MULTICAST)
+      set(MDNSD_DYNAMIC_LINKING ON)
+  endif()
 endif()
 
 if(UA_ENABLE_SUBSCRIPTIONS_ALARMS_CONDITIONS)
@@ -485,13 +501,18 @@ endif()
 
 set(open62541_LIBRARIES "")
 set(open62541_PUBLIC_LIBRARIES "")
+set(pkgcfg_libsprivate "")
+set(pkgcfg_requiresprivate "")
 if("${UA_ARCHITECTURE}" STREQUAL "posix")
     list(APPEND open62541_LIBRARIES "m")
+    list(APPEND pkgcfg_libsprivate "-lm")
     if(UA_MULTITHREADING GREATER_EQUAL 100 OR UA_BUILD_UNIT_TESTS AND NOT ANDROID_NDK_TOOLCHAIN_INCLUDED)
         list(APPEND open62541_PUBLIC_LIBRARIES "pthread")
+        list(APPEND pkgcfg_libsprivate "-lpthread")
     endif()
     if(NOT APPLE AND (NOT ${CMAKE_SYSTEM_NAME} MATCHES "OpenBSD") AND NOT ANDROID_NDK_TOOLCHAIN_INCLUDED)
         list(APPEND open62541_LIBRARIES "rt")
+        list(APPEND pkgcfg_libsprivate "-lrt")
     endif()
 elseif("${UA_ARCHITECTURE}" STREQUAL "win32")
     list(APPEND open62541_LIBRARIES "ws2_32")
@@ -503,6 +524,7 @@ if(UA_ENABLE_ENCRYPTION_OPENSSL)
     # https://cmake.org/cmake/help/v3.13/module/FindOpenSSL.html
     find_package(OpenSSL REQUIRED)
     list(APPEND open62541_LIBRARIES "${OPENSSL_LIBRARIES}")
+    list(APPEND pkgcfg_requiresprivate "openssl")
     if(WIN32)
         # Add bestcrypt for windows systems
         list(APPEND open62541_LIBRARIES bcrypt)
@@ -513,6 +535,7 @@ if(UA_ENABLE_ENCRYPTION_LIBRESSL)
     # See https://github.com/libressl-portable/portable/blob/master/FindLibreSSL.cmake
     find_package(LibreSSL REQUIRED)
     list(APPEND open62541_LIBRARIES ${LIBRESSL_LIBRARIES})
+    list(APPEND pkgcfg_requiresprivate "openssl")
     if(WIN32)
         # Add bestcrypt for random generator and ws2_32 for crypto
         list(APPEND open62541_LIBRARIES ws2_32 bcrypt)
@@ -525,6 +548,7 @@ if(UA_ENABLE_ENCRYPTION_MBEDTLS)
     # defined in /tools/cmake/FindMbedTLS.cmake.
     find_package(MbedTLS REQUIRED)
     list(APPEND open62541_LIBRARIES ${MBEDTLS_LIBRARIES})
+    list(APPEND pkgcfg_requiresprivate "mbedtls")
     if(WIN32)
         # Add bestcrypt for windows systems
         list(APPEND open62541_LIBRARIES bcrypt)
@@ -533,6 +557,7 @@ endif()
 
 if(UA_ENABLE_TPM2_SECURITY)
     list(APPEND open62541_LIBRARIES ${TPM2_LIB})
+    list(APPEND pkgcfg_requiresprivate "tpm2-pkcs11")
 endif()
 
 if(MINGW)
@@ -594,6 +619,7 @@ if((CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang") AND
     check_add_cc_flag("-Wall")      # Warnings
     check_add_cc_flag("-Wextra")    # More warnings
     check_add_cc_flag("-Wpedantic") # Standard compliance
+    #check_add_cc_flag("-Wshadow")  # still disabled per default
     if(UA_FORCE_WERROR)
         check_add_cc_flag("-Werror") # All warnings are errors
         check_add_cc_flag("-Wunused-command-line-argument") # Warning for command line args instead of error
@@ -716,7 +742,7 @@ if((CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang") AND
         check_add_cc_flag("-fno-unwind-tables")
         check_add_cc_flag("-fno-asynchronous-unwind-tables")
         check_add_cc_flag("-fno-math-errno")
-        #        check_add_cc_flag("-fno-ident")
+#        check_add_cc_flag("-fno-ident")
 
         # remove stack-protector with MinSizeRel
         if(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
@@ -739,18 +765,18 @@ if(APPLE)
 endif()
 
 if(MSVC)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3 /w44996")
-    if(UA_FORCE_WERROR)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX") # Compiler warnings, error on warning
-    endif()
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3 /w44996")
+  if(UA_FORCE_WERROR)
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX") # Compiler warnings, error on warning
+  endif()
 
-    if(UA_MSVC_FORCE_STATIC_CRT AND NOT BUILD_SHARED_LIBS)
-        set(CompilerFlags CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_C_FLAGS
+  if(UA_MSVC_FORCE_STATIC_CRT AND NOT BUILD_SHARED_LIBS)
+    set(CompilerFlags CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_C_FLAGS
         CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE)
-        foreach(CompilerFlag ${CompilerFlags})
-            string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
-        endforeach()
-    endif()
+    foreach(CompilerFlag ${CompilerFlags})
+      string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
+    endforeach()
+  endif()
 endif()
 
 if(UA_BUILD_FUZZING OR UA_BUILD_OSS_FUZZ)
@@ -859,6 +885,7 @@ set(lib_sources ${PROJECT_SOURCE_DIR}/src/ua_types.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_server_config.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_server_binary.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_server_utils.c
+                ${PROJECT_SOURCE_DIR}/src/server/ua_server_auditing.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_server_async.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_subscription.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_subscription_datachange.c
@@ -873,7 +900,14 @@ set(lib_sources ${PROJECT_SOURCE_DIR}/src/ua_types.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_services_subscription.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_services_monitoreditem.c
                 ${PROJECT_SOURCE_DIR}/src/server/ua_services_securechannel.c
-                ${PROJECT_SOURCE_DIR}/src/server/ua_services_nodemanagement.c
+                ${PROJECT_SOURCE_DIR}/src/server/ua_services_nodemanagement.c)
+
+if(UA_ENABLE_RBAC)
+    list(APPEND lib_sources ${PROJECT_SOURCE_DIR}/src/server/ua_server_rbac.c)
+    list(APPEND lib_sources ${PROJECT_SOURCE_DIR}/src/server/ua_server_ns0_rbac.c)
+endif()
+
+set(lib_sources ${lib_sources}
                 # client
                 ${PROJECT_SOURCE_DIR}/src/client/ua_client.c
                 ${PROJECT_SOURCE_DIR}/src/client/ua_client_connect.c
@@ -998,34 +1032,22 @@ set(plugin_sources ${PROJECT_SOURCE_DIR}/plugins/ua_log_stdout.c
                    ${PROJECT_SOURCE_DIR}/plugins/crypto/ua_certificategroup_none.c
                    ${PROJECT_SOURCE_DIR}/plugins/crypto/ua_securitypolicy_none.c)
 
-if(UA_ARCHITECTURE_POSIX OR UA_ARCHITECTURE_WIN32 OR UA_ENABLE_AMALGAMATION)
-    list(APPEND plugin_sources
-         ${PROJECT_SOURCE_DIR}/arch/common/timer.h
-         ${PROJECT_SOURCE_DIR}/arch/common/timer.c
-         ${PROJECT_SOURCE_DIR}/arch/posix/clock_posix.c
-         ${PROJECT_SOURCE_DIR}/arch/common/eventloop_common.h
-         ${PROJECT_SOURCE_DIR}/arch/common/eventloop_common.c
-         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix.h
-         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix.c
-         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix_tcp.c
-         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix_udp.c
-         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix_eth.c
-         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix_interrupt.c)
+# Add clock implementation based on the base architecture
+if(UA_ARCHITECTURE_POSIX OR UA_ARCHITECTURE_WIN32)
+    list(APPEND plugin_sources ${PROJECT_SOURCE_DIR}/arch/posix/clock_posix.c)
 endif()
 
 if(UA_ARCHITECTURE_ZEPHYR)
-    list(APPEND plugin_sources
-         ${PROJECT_SOURCE_DIR}/arch/common/timer.h
-         ${PROJECT_SOURCE_DIR}/arch/common/timer.c
-         ${PROJECT_SOURCE_DIR}/arch/zephyr/clock_zephyr.c
-         ${PROJECT_SOURCE_DIR}/arch/common/eventloop_common.h
-         ${PROJECT_SOURCE_DIR}/arch/common/eventloop_common.c
-         ${PROJECT_SOURCE_DIR}/arch/zephyr/eventloop_zephyr.h
-         ${PROJECT_SOURCE_DIR}/arch/zephyr/eventloop_zephyr.c
-         ${PROJECT_SOURCE_DIR}/arch/zephyr/eventloop_zephyr_tcp.c)
+    list(APPEND plugin_sources ${PROJECT_SOURCE_DIR}/arch/zephyr/clock_zephyr.c)
 endif()
 
+if(UA_ARCHITECTURE_FREERTOS)
+    list(APPEND plugin_sources ${PROJECT_SOURCE_DIR}/arch/freertos/clock_freertos.c)
+endif()
+
+# Add eventloop and common files (mutually exclusive based on eventloop type)
 if(UA_ARCHITECTURE_LWIP)
+    # LWIP eventloop (for freertos-lwip or posix-lwip)
     list(APPEND plugin_sources
             ${PROJECT_SOURCE_DIR}/arch/common/timer.h
             ${PROJECT_SOURCE_DIR}/arch/common/timer.c
@@ -1035,6 +1057,29 @@ if(UA_ARCHITECTURE_LWIP)
             ${PROJECT_SOURCE_DIR}/arch/lwip/eventloop_lwip.c
             ${PROJECT_SOURCE_DIR}/arch/lwip/eventloop_lwip_tcp.c
             ${PROJECT_SOURCE_DIR}/arch/lwip/eventloop_lwip_udp.c)
+elseif(UA_ARCHITECTURE_ZEPHYR)
+    # Zephyr eventloop
+    list(APPEND plugin_sources
+         ${PROJECT_SOURCE_DIR}/arch/common/timer.h
+         ${PROJECT_SOURCE_DIR}/arch/common/timer.c
+         ${PROJECT_SOURCE_DIR}/arch/common/eventloop_common.h
+         ${PROJECT_SOURCE_DIR}/arch/common/eventloop_common.c
+         ${PROJECT_SOURCE_DIR}/arch/zephyr/eventloop_zephyr.h
+         ${PROJECT_SOURCE_DIR}/arch/zephyr/eventloop_zephyr.c
+         ${PROJECT_SOURCE_DIR}/arch/zephyr/eventloop_zephyr_tcp.c)
+elseif(UA_ARCHITECTURE_POSIX OR UA_ARCHITECTURE_WIN32 OR UA_ENABLE_AMALGAMATION)
+    # POSIX eventloop (default for amalgamation)
+    list(APPEND plugin_sources
+         ${PROJECT_SOURCE_DIR}/arch/common/timer.h
+         ${PROJECT_SOURCE_DIR}/arch/common/timer.c
+         ${PROJECT_SOURCE_DIR}/arch/common/eventloop_common.h
+         ${PROJECT_SOURCE_DIR}/arch/common/eventloop_common.c
+         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix.h
+         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix.c
+         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix_tcp.c
+         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix_udp.c
+         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix_eth.c
+         ${PROJECT_SOURCE_DIR}/arch/posix/eventloop_posix_interrupt.c)
 endif()
 
 if(UA_ARCHITECTURE_FREERTOS)
@@ -1048,7 +1093,6 @@ if(UA_ARCHITECTURE_FREERTOS)
     add_compile_definitions(projCOVERAGE_TEST=0)
     add_compile_definitions(projENABLE_TRACING=0)
     list(APPEND open62541_LIBRARIES freertos_config freertos_kernel)
-    list(APPEND plugin_sources ${PROJECT_SOURCE_DIR}/arch/freertos/clock_freertos.c)
 endif()
 
 if(UA_ENABLE_MQTT)
@@ -1150,7 +1194,7 @@ endif()
 # Generate source files #
 #########################
 
-# List of nodeset-xml files to be considered in the generated information model
+ # List of nodeset-xml files to be considered in the generated information model
 set(UA_NS0_NODESETS)
 
 if(UA_NAMESPACE_ZERO STREQUAL "FULL")
@@ -1335,16 +1379,18 @@ endif()
 if(UA_ENABLE_NODESET_INJECTOR)
     message(STATUS "Nodesetinjector feature enabled")
     set(UA_NODESETINJECTOR_SOURCE_FILES "") # List is appended from within ua_generate_nodeset
+    set(UA_NODESETINJECTOR_NAMES "") # Ordered list of AUTOLOAD namespace names
 
     add_custom_target(open62541-generator-nodesetinjector)
     add_dependencies(open62541-code-generation open62541-generator-nodesetinjector)
 
     add_subdirectory(tools/nodeset_injector)
+
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/src_generated/open62541/nodesetinjector.h
                               ${PROJECT_BINARY_DIR}/src_generated/open62541/nodesetinjector.c
                        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/nodeset_injector/generate_nodesetinjector.py
                                                      ${PROJECT_BINARY_DIR}/src_generated/open62541/nodesetinjector
-                                                     ${UA_INFORMATION_MODEL_AUTOLOAD})
+                                                     ${UA_NODESETINJECTOR_NAMES})
 
     set_source_files_properties(${UA_NODESETINJECTOR_SOURCE_FILES} PROPERTIES GENERATED 1)
     list(APPEND lib_headers ${PROJECT_BINARY_DIR}/src_generated/open62541/nodesetinjector.h)
@@ -1431,6 +1477,9 @@ add_library(open62541::open62541 ALIAS open62541)
 target_compile_definitions(open62541-object PRIVATE -DUA_DYNAMIC_LINKING_EXPORT)
 target_compile_definitions(open62541-plugins PRIVATE -DUA_DYNAMIC_LINKING_EXPORT)
 target_compile_definitions(open62541 PRIVATE -DUA_DYNAMIC_LINKING_EXPORT)
+if(UA_NODESET_INJECTOR_NEEDS_ROLESET)
+    target_compile_definitions(open62541-object PRIVATE -DUA_NODESET_INJECTOR_NEEDS_ROLESET)
+endif()
 if(UA_ENABLE_DISCOVERY_MULTICAST_MDNSD)
     target_compile_definitions(open62541-object PRIVATE -DMDNSD_DYNAMIC_LINKING_EXPORT)
     target_compile_definitions(open62541 PRIVATE -DMDNSD_DYNAMIC_LINKING_EXPORT)
@@ -1551,6 +1600,12 @@ if(BUILD_SHARED_LIBS)
     endforeach()
 endif()
 
+if(UA_ENABLE_AMALGAMATION)
+    set(PC_EXTRA_CFLAGS "-DUA_ENABLE_AMALGAMATION")
+endif()
+
+string(REPLACE ";" " " pkgcfg_requiresprivate "${pkgcfg_requiresprivate}")
+string(REPLACE ";" " " pkgcfg_libsprivate "${pkgcfg_libsprivate}")
 configure_file(tools/open62541.pc.in ${PROJECT_BINARY_DIR}/src_generated/open62541.pc @ONLY)
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
@@ -1580,7 +1635,8 @@ install(DIRECTORY ${UA_SCHEMA_DIR}/
         PERMISSIONS OWNER_READ GROUP_READ)
 
 # Install python tools
-set(UA_install_tools_files "tools/generate_datatypes.py"
+set(UA_install_tools_files "tools/generate_bsd.py"
+                           "tools/generate_datatypes.py"
                            "tools/generate_nodeid_header.py"
                            "tools/generate_statuscode_descriptions.py")
 install(FILES ${UA_install_tools_files} DESTINATION ${open62541_install_tools_dir}

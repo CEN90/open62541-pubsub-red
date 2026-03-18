@@ -463,7 +463,7 @@ ReadWithNodeMaybeAsync(const UA_Node *node, UA_Server *server, UA_Session *sessi
 #ifdef UA_ENABLE_TYPEDESCRIPTION
         /* Find the DataType */
         const UA_DataType *type =
-            UA_findDataTypeWithCustom(&node->head.nodeId, server->config.customDataTypes);
+            UA_findDataTypeWithCustom(&node->head.nodeId, serverCustomTypes(server));
         if(!type) {
             retval = UA_STATUSCODE_BADATTRIBUTEIDINVALID;
             break;
@@ -1568,12 +1568,14 @@ writeIsAbstract(UA_Node *node, UA_Boolean value) {
         break;                                              \
     }
 
-#define GET_NODETYPE                                \
-    type = (const UA_VariableTypeNode*)             \
-        getNodeType(server, &node->head);           \
-    if(!type) {                                     \
-        retval = UA_STATUSCODE_BADTYPEMISMATCH;     \
-        break;                                      \
+#define GET_NODETYPE                                    \
+    type = (const UA_VariableTypeNode*)                 \
+        getNodeType(server, &node->head, ~(UA_UInt32)0, \
+                    UA_REFERENCETYPESET_NONE,           \
+                    UA_BROWSEDIRECTION_INVALID);        \
+    if(!type) {                                         \
+        retval = UA_STATUSCODE_BADTYPEMISMATCH;         \
+        break;                                          \
     }
 
 /* Update a localized text. Don't touch the target if copying fails
@@ -1646,13 +1648,13 @@ copyAttributeIntoNode(UA_Server *server, UA_Session *session,
     case UA_ATTRIBUTEID_DISPLAYNAME:
         CHECK_USERWRITEMASK(UA_WRITEMASK_DISPLAYNAME);
         CHECK_DATATYPE_SCALAR(LOCALIZEDTEXT);
-        retval = UA_Node_insertOrUpdateDisplayName(&node->head,
+        retval = UA_Node_insertOrUpdateDisplayName(node,
                                                    (const UA_LocalizedText *)value);
         break;
     case UA_ATTRIBUTEID_DESCRIPTION:
         CHECK_USERWRITEMASK(UA_WRITEMASK_DESCRIPTION);
         CHECK_DATATYPE_SCALAR(LOCALIZEDTEXT);
-        retval = UA_Node_insertOrUpdateDescription(&node->head,
+        retval = UA_Node_insertOrUpdateDescription(node,
                                                    (const UA_LocalizedText *)value);
         break;
     case UA_ATTRIBUTEID_WRITEMASK:
@@ -1730,7 +1732,7 @@ copyAttributeIntoNode(UA_Server *server, UA_Session *session,
         break;
     case UA_ATTRIBUTEID_ARRAYDIMENSIONS:
         CHECK_NODECLASS_WRITE(UA_NODECLASS_VARIABLE | UA_NODECLASS_VARIABLETYPE);
-        CHECK_USERWRITEMASK(UA_WRITEMASK_ARRRAYDIMENSIONS);
+        CHECK_USERWRITEMASK(UA_WRITEMASK_ARRAYDIMENSIONS);
         CHECK_DATATYPE_ARRAY(UINT32);
         GET_NODETYPE;
         retval = writeArrayDimensionsAttribute(server, session, &node->variableNode,
@@ -1789,15 +1791,50 @@ copyAttributeIntoNode(UA_Server *server, UA_Session *session,
     return UA_STATUSCODE_GOOD;
 }
 
+static UA_THREAD_LOCAL UA_Boolean preventAuditEventRecursion = false;
+
 UA_Boolean
 Operation_Write(UA_Server *server, UA_Session *session,
                 const UA_WriteValue *wv, UA_StatusCode *result) {
     UA_assert(session != NULL);
+
+    /* Get the old value for the audit event */
+#ifdef UA_ENABLE_AUDITING
+    UA_DataValue oldValue;
+    if(!preventAuditEventRecursion && server->config.auditingEnabled &&
+       server->config.auditWriteUpdateEnabled) {
+        preventAuditEventRecursion = true;
+        UA_ReadValueId rvi;
+        UA_ReadValueId_init(&rvi);
+        rvi.nodeId = wv->nodeId;
+        rvi.attributeId = wv->attributeId;
+        rvi.indexRange = wv->indexRange;
+        oldValue = readWithSession(server, session, &rvi, UA_TIMESTAMPSTORETURN_NEITHER);
+        preventAuditEventRecursion = false;
+    } else {
+        UA_DataValue_init(&oldValue);
+    }
+#endif
+
     *result = editNode(server, session, &wv->nodeId, wv->attributeId,
                        UA_REFERENCETYPESET_NONE, UA_BROWSEDIRECTION_INVALID,
                        (UA_EditNodeCallback)copyAttributeIntoNode,
                        (void*)(uintptr_t)wv);
-    return (*result != UA_STATUSCODE_GOODCOMPLETESASYNCHRONOUSLY);
+    UA_Boolean done = (*result != UA_STATUSCODE_GOODCOMPLETESASYNCHRONOUSLY);
+
+    /* Generate audit event for writing variables.
+     * TODO: Audit events for async writes. */
+#ifdef UA_ENABLE_AUDITING
+    if(done && server->config.auditingEnabled && server->config.auditWriteUpdateEnabled) {
+        auditWriteUpdateEvent(server, session->channel, session,
+                              (*result == UA_STATUSCODE_GOOD),
+                              &wv->nodeId, wv->attributeId, wv->indexRange,
+                              &wv->value.value, &oldValue.value);
+    }
+    UA_DataValue_clear(&oldValue);
+#endif
+
+    return done;
 }
 
 UA_StatusCode
