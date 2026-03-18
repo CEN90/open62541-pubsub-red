@@ -69,6 +69,7 @@ doc_src/
 /exampleClient_legacy
 /src_generated/
 **/build
+**/build_*
 /cmake-build*
 /tools/certs/certs/*
 Pipfile
@@ -84,7 +85,6 @@ debian/*
 .vim/
 # IDE specific settings
 .idea/
-.zed/
 *.iml
 *.iws
 *.ipr
@@ -97,4 +97,3 @@ nbbuild/
 dist/
 nbdist/
 .nb-gradle/
-__cmake*
