@@ -1,0 +1,38 @@
+[
+{
+  "directory": "/home/opcua/open62541-pubsub-red/redundancy",
+  "command": "/usr/bin/cc  -I/home/opcua/open62541-pubsub-red/redundancy/include -g -o CMakeFiles/pubsub_subscriber.dir/pubsub_subscriber.c.o -c /home/opcua/open62541-pubsub-red/redundancy/pubsub_subscriber.c",
+  "file": "/home/opcua/open62541-pubsub-red/redundancy/pubsub_subscriber.c",
+  "output": "CMakeFiles/pubsub_subscriber.dir/pubsub_subscriber.c.o"
+},
+{
+  "directory": "/home/opcua/open62541-pubsub-red/redundancy",
+  "command": "/usr/bin/cc  -I/home/opcua/open62541-pubsub-red/redundancy/include -g -o CMakeFiles/pubsub_publisher.dir/pubsub_publisher.c.o -c /home/opcua/open62541-pubsub-red/redundancy/pubsub_publisher.c",
+  "file": "/home/opcua/open62541-pubsub-red/redundancy/pubsub_publisher.c",
+  "output": "CMakeFiles/pubsub_publisher.dir/pubsub_publisher.c.o"
+},
+{
+  "directory": "/home/opcua/open62541-pubsub-red/redundancy",
+  "command": "/usr/bin/cc  -I/home/opcua/open62541-pubsub-red/redundancy/include -g -o CMakeFiles/pubsub_publisher.dir/src/pubsub_heartbeat.c.o -c /home/opcua/open62541-pubsub-red/redundancy/src/pubsub_heartbeat.c",
+  "file": "/home/opcua/open62541-pubsub-red/redundancy/src/pubsub_heartbeat.c",
+  "output": "CMakeFiles/pubsub_publisher.dir/src/pubsub_heartbeat.c.o"
+},
+{
+  "directory": "/home/opcua/open62541-pubsub-red/redundancy",
+  "command": "/usr/bin/cc  -I/home/opcua/open62541-pubsub-red/redundancy/include -g -o CMakeFiles/pubsub_publisher.dir/src/pubsub_redundancy.c.o -c /home/opcua/open62541-pubsub-red/redundancy/src/pubsub_redundancy.c",
+  "file": "/home/opcua/open62541-pubsub-red/redundancy/src/pubsub_redundancy.c",
+  "output": "CMakeFiles/pubsub_publisher.dir/src/pubsub_redundancy.c.o"
+},
+{
+  "directory": "/home/opcua/open62541-pubsub-red/redundancy",
+  "command": "/usr/bin/cc  -I/home/opcua/open62541-pubsub-red/redundancy/include -g -o CMakeFiles/pubsub_publisher.dir/src/pubsub_sync.c.o -c /home/opcua/open62541-pubsub-red/redundancy/src/pubsub_sync.c",
+  "file": "/home/opcua/open62541-pubsub-red/redundancy/src/pubsub_sync.c",
+  "output": "CMakeFiles/pubsub_publisher.dir/src/pubsub_sync.c.o"
+},
+{
+  "directory": "/home/opcua/open62541-pubsub-red/redundancy",
+  "command": "/usr/bin/cc  -I/home/opcua/open62541-pubsub-red/redundancy/include -g -o CMakeFiles/pubsub_publisher.dir/src/redundancy_state.c.o -c /home/opcua/open62541-pubsub-red/redundancy/src/redundancy_state.c",
+  "file": "/home/opcua/open62541-pubsub-red/redundancy/src/redundancy_state.c",
+  "output": "CMakeFiles/pubsub_publisher.dir/src/redundancy_state.c.o"
+}
+]

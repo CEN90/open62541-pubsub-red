@@ -1,13 +1,20 @@
-#include "open62541/pubsub_publisher.h"
+#include "pubsub_publisher.h"
 
 #include <open62541/plugin/log_stdout.h>
-#include <open62541/pubsub_sync.h>
 #include <open62541/server.h>
 #include <open62541/server_config_default.h>
 #include <open62541/server_pubsub.h>
 
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
+
+#include "include/pubsub_redundancy.h"
+
+#define N 1
+#define FAKEVALUE 62541
+
+void
+runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary);
 
 static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
     dataSetWriterIdent;
@@ -164,21 +171,24 @@ updateFakeValue(UA_Server *server, void *data) {
     }
 }
 
-void *
-runPublisher(void *data) {
-    cbstruct_s *stateStruct = (cbstruct_s *)data;
-    UA_Boolean *isPrimary = stateStruct->isPrimary;
-    State_s *state = stateStruct->data;
-
+void
+runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
+    UA_Int64 fakeValue = FAKEVALUE;
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *config = UA_Server_getConfig(server);
     UA_ServerConfig_setDefault(config);
-    UA_Int64 fakeValue = 62541;
 
     UA_String transportProfile =
         UA_STRING("http://opcfoundation.org/UA-Profile/Transport/pubsub-udp-uadp");
     UA_NetworkAddressUrlDataType networkAddressUrl = {
         UA_STRING_NULL, UA_STRING("opc.udp://224.0.0.22:4842/")};
+
+    RedundancyState_s state;
+    state.nmSequenceNr = 0;
+    state.dswSequenceNr = 0;
+    state.applicationStatesSize = N;
+    state.applicationStates =
+        (UA_KeyValuePair *)UA_Array_new(N, &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
 
     // common
     addPubSubConnection(server, &transportProfile, &networkAddressUrl);
@@ -196,13 +206,51 @@ runPublisher(void *data) {
 
     UA_Server_enableAllPubSubComponents(server);
 
-    init(state, isPrimary, server, writerGroupIdent);
+    init(isPrimary, &state, hb_config);
 
     while(true) {
-        UA_StatusCode retval = syncState(state, isPrimary, server, writerGroupIdent);
+        UA_StatusCode retval =
+            syncState(&state, isPrimary, server, writerGroupIdent, dataSetWriterIdent);
 
         UA_Server_run_iterate(server, true);
     }
 
     UA_Server_delete(server);
+}
+
+int
+main(int argc, char *argv[]) {
+    const int port = 10001;
+    UA_Boolean isPrimary = UA_FALSE;
+    char redDcnIp[IPADDRLEN] = "127.0.0.1";
+
+    if(argc == 3) {
+        strcpy(redDcnIp, argv[2]);
+
+        if(strcmp(argv[1], "--primary") == 0)
+            isPrimary = UA_TRUE;
+        else if(strcmp(argv[1], "--backup") == 0)
+            isPrimary = UA_FALSE;
+        else {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Invalid argument: %s",
+                         argv[1]);
+            return -1;
+        }
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "Usage: %s [--primary | --backup] <redundancy Controller IP>",
+                     argv[0]);
+        return -1;
+    }
+
+    HeartbeatConfig config = {
+        .port = &port,
+        .ipAddress = redDcnIp,
+        .sockfd = NULL,
+        .isPrimary = &isPrimary,
+    };
+
+    runPublisher(&config, &isPrimary);
+
+    return 0;
 }

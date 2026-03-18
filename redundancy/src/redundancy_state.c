@@ -1,5 +1,5 @@
-#include <open62541/redundancy_state.h>
 #include <open62541/types_generated.h>
+#include "../include/redundancy_state.h"
 
 
 
@@ -25,7 +25,6 @@ static UA_DataTypeMember members[3] = {
 };
 
 UA_DataType RedundancyStateType = {
-    .typeId = UA_NODEID_STRING(1, "RedundancyState"),
     .memSize = sizeof(RedundancyState_s),
     .typeKind = UA_DATATYPEKIND_STRUCTURE,
     .pointerFree = false,

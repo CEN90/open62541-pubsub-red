@@ -1,6 +1,4 @@
 #include <open62541/plugin/log_stdout.h>
-#include <open62541/pubsub_heartbeat.h>
-
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
 
@@ -14,6 +12,8 @@
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+
+#include "../include/pubsub_heartbeat.h"
 
 UA_DateTime prevHbTime = 0;
 int epoll_fd = -1;

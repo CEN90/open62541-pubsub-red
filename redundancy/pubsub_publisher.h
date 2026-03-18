@@ -1,0 +1,19 @@
+#ifndef PUBLISHER_H
+#define PUBLISHER_H
+
+#include <open62541/server.h>
+#include <open62541/server_pubsub.h>
+#include <open62541/types.h>
+
+
+
+#define PUBLISHER_PUBLISHERID 4333
+#define PUBLISHER_WRITERGROUDID 433
+#define PUBLISHER_DATASETWRITERID 43
+
+#define CHECK_PRIMARY_STATUS_INTERVAL 100
+#define PUBLISHER_PUBLISHINGINTERVAL 1000
+#define PUBLISHER_KEYFRAMECOUNT 10
+
+
+#endif

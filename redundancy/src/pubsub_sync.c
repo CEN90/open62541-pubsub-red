@@ -1,4 +1,4 @@
-#include "open62541/pubsub_sync.h"
+#include "../include/pubsub_sync.h"
 
 #include <open62541/plugin/log_stdout.h>
 #include <open62541/server.h>
@@ -8,11 +8,18 @@
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
 
+
+
 static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
     dataSetWriterIdent, readerGroupIdentifier, readerIdentifier;
 
 static UA_DataSetReaderConfig readerConfig;
 static UA_Boolean lastIsPrimary = UA_FALSE;
+
+void
+initRedundancyStateType(void) {
+    RedundancyStateType.typeId = UA_NODEID_STRING(1, "RedundancyState");
+}
 
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
@@ -51,14 +58,14 @@ addPublishedDataSet(UA_Server *server) {
 }
 
 static UA_NodeId
-addStateVariable(UA_Server *server, State_s *state) {
+addStateVariable(UA_Server *server, RedundancyState_s *stateStruct) {
     UA_VariableAttributes attr = UA_VariableAttributes_default;
     attr.displayName = UA_LOCALIZEDTEXT("en-US", "state");
-    attr.dataType = UA_TYPES[UA_TYPES_INT16].typeId;
+    attr.dataType = RedundancyStateType.typeId;
     attr.valueRank = -1;
     UA_Variant value;
 
-    UA_Variant_setScalar(&value, &(state->state), &UA_TYPES[UA_TYPES_INT16]);
+    UA_Variant_setScalar(&value, stateStruct, &RedundancyStateType);
     attr.value = value;
 
     UA_NodeId stateNodeId = UA_NODEID_STRING(1, "state");
@@ -67,23 +74,26 @@ addStateVariable(UA_Server *server, State_s *state) {
         UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES), UA_QUALIFIEDNAME(1, "state"),
         UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), attr, NULL, NULL);
 
-    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "State %d",
-                 *(int16_t *)value.data);
+    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                 "nmSequenceNr: %d, dsmSequenceNr: %d, arraySize: %lu",
+                 stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
+                 (unsigned long)stateStruct->applicationStatesSize);
     return stateNodeId;
 }
 
 static void
-addStateDataField(UA_Server *server, State_s *state, UA_NodeId *stateNodeId) {
+addStateDataField(UA_Server *server, RedundancyState_s *stateStruct,
+                  UA_NodeId *stateNodeId) {
     UA_NodeId dataSetFieldIdent;
     UA_DataSetFieldConfig dataSetFieldConfig;
 
-    *stateNodeId = addStateVariable(server, state);
+    *stateNodeId = addStateVariable(server, stateStruct);
     memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
     dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
     dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("state");
     dataSetFieldConfig.field.variable.promotedField = UA_FALSE;
     dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
-        addStateVariable(server, state);
+        addStateVariable(server, stateStruct);
     dataSetFieldConfig.field.variable.publishParameters.attributeId =
         UA_ATTRIBUTEID_VALUE;
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldConfig,
@@ -259,7 +269,7 @@ addSubscribedVariables(UA_Server *server, UA_NodeId dataSetReaderId,
 static void
 fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
     UA_DataSetMetaDataType_init(pMetaData);
-    pMetaData->name = UA_STRING("DataSet 1");
+    pMetaData->name = UA_STRING("RedundancyStateDataSet");
 
     /* Now there is only 1 field (Int16) */
     pMetaData->fieldsSize = 1;
@@ -268,8 +278,8 @@ fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
 
     /* Int16 DataType */
     UA_FieldMetaData_init(&pMetaData->fields[0]);
-    UA_NodeId_copy(&UA_TYPES[UA_TYPES_INT16].typeId, &pMetaData->fields[0].dataType);
-    pMetaData->fields[0].builtInType = UA_NS0ID_INT16;
+    UA_NodeId_copy(&RedundancyStateType.typeId, &pMetaData->fields[0].dataType);
+    pMetaData->fields[0].builtInType = UA_NS0ID_STRUCTURE;
     pMetaData->fields[0].name = UA_STRING("state");
     pMetaData->fields[0].valueRank = -1; /* scalar */
 }
@@ -280,7 +290,7 @@ fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
  */
 
 static void
-readSyncState(UA_Server *server, State_s *stateStruct) {
+readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
     UA_Variant value;
     UA_Variant_init(&value);
 
@@ -300,10 +310,32 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
         return;
     }
 
-    if(UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_INT16])) {
-        int16_t state = *(int16_t *)value.data;
-        stateStruct->state = state;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Sync state read: %lld", state);
+    if(UA_Variant_hasScalarType(&value, &RedundancyStateType)) {
+        RedundancyState_s *remoteState = (RedundancyState_s *)value.data;
+
+        stateStruct->nmSequenceNr = remoteState->nmSequenceNr;
+        stateStruct->dswSequenceNr = remoteState->dswSequenceNr;
+
+        stateStruct->applicationStatesSize = remoteState->applicationStatesSize;
+
+        if(stateStruct->applicationStates)
+            UA_Array_delete(stateStruct->applicationStates,
+                            stateStruct->applicationStatesSize,
+                            &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+
+        if(remoteState->applicationStatesSize > 0) {
+            stateStruct->applicationStates = UA_Array_new(
+                remoteState->applicationStatesSize, &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+            for(size_t i = 0; i < remoteState->applicationStatesSize; i++)
+                stateStruct->applicationStates[i] = remoteState->applicationStates[i];
+        } else {
+            stateStruct->applicationStates = NULL;
+        }
+
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                    "Sync state read: nmSeq=%d dsmSeq=%d arraySize=%lu",
+                    stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
+                    (unsigned long)stateStruct->applicationStatesSize);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "state is not an Int16 type");
     }
@@ -312,13 +344,23 @@ readSyncState(UA_Server *server, State_s *stateStruct) {
 }
 
 static void
-setSyncState(UA_Server *server, State_s *stateStruct) {
+setSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_Int16 state = stateStruct->state;
-    UA_Variant_setScalar(&value, &state, &UA_TYPES[UA_TYPES_INT16]);
-    UA_Server_writeValue(server, UA_NODEID_STRING(1, "state"), value);
+    UA_Variant_setScalar(&value, &stateStruct, &RedundancyStateType);
+    UA_StatusCode retval =
+        UA_Server_writeValue(server, UA_NODEID_STRING(1, "state"), value);
+
+    if(retval != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                     "Failed to write RedundancyState: 0x%08x", retval);
+    } else {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                    "RedundancyState written: nmSeq=%d dsmSeq=%d arraySize=%lu",
+                    stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
+                    (unsigned long)stateStruct->applicationStatesSize);
+    }
 }
 
 static void
@@ -360,7 +402,7 @@ onDemandSync(UA_Server *server, void *data) {
 }
 
 static void
-setupPubSub(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
+setupPubSub(UA_Boolean *isPrimary, RedundancyState_s *state, connectionConfig_s *config) {
     UA_String transportProfile =
         UA_STRING("http://opcfoundation.org/UA-Profile/Transport/pubsub-udp-uadp");
     UA_NetworkAddressUrlDataType networkAddressUrl = {
@@ -373,7 +415,7 @@ void *
 initSync(void *data) {
     cbstruct_s *stateStruct = (cbstruct_s *)data;
     UA_Boolean *isPrimary = stateStruct->isPrimary;
-    State_s *state = stateStruct->data;
+    RedundancyState_s *state = stateStruct->data;
     setupPubSub(isPrimary, state, NULL);
 
     return NULL;
@@ -381,13 +423,17 @@ initSync(void *data) {
 
 void
 runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddressUrl,
-          UA_Boolean *isPrimary, State_s *state) {
+          UA_Boolean *isPrimary, RedundancyState_s *state) {
 
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *config = UA_Server_getConfig(server);
     UA_NodeId stateNodeId;
 
     UA_ServerConfig_setDefault(config);
+
+    initRedundancyStateType();
+    UA_Server_addDataType(server, UA_NODEID_NUMERIC(0, UA_NS0ID_STRUCTURE),
+                          &RedundancyStateType);
 
     // common
     addPubSubConnection(server, transportProfile, networkAddressUrl);
