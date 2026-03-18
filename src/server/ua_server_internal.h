@@ -184,6 +184,26 @@ getServerComponentByName(UA_Server *server, UA_String name);
 /* Server Structure */
 /********************/
 
+#ifdef UA_ENABLE_RBAC
+/* Internal role-permission entry with reference counting.
+ * Multiple nodes can share the same entry via the permissionIndex stored
+ * in the node head. Entries originating from the server configuration
+ * presets have refCount set to UA_ROLEPERMISSIONS_REFCOUNT_PROTECTED to
+ * prevent deletion during server runtime. */
+typedef struct {
+    size_t rolePermissionsSize;
+    UA_RolePermission *rolePermissions;
+    size_t refCount;
+} UA_RolePermissionEntry;
+
+/* Internal RBAC lifecycle */
+UA_StatusCode UA_Server_initRBAC(UA_Server *server);
+void UA_Server_cleanupRBAC(UA_Server *server);
+
+/* Initialize RBAC information model (NS0 role representations and methods) */
+UA_StatusCode initNS0RBAC(UA_Server *server);
+#endif /* UA_ENABLE_RBAC */
+
 typedef struct session_list_entry {
     UA_DelayedCallback cleanupCallback;
     LIST_ENTRY(session_list_entry) pointers;
@@ -206,6 +226,12 @@ struct UA_Server {
     UA_ServerComponentTree serverComponents;
 
     UA_AsyncManager asyncManager;
+
+    /* Custom datatypes that are internally created and cleaned up at the end of
+     * the server lifecycle. The next->pointer points to the server config. So
+     * we can use customTypes_internal as the universal entry. */
+    UA_DataTypeArray *customTypes_internal;
+    size_t customTypes_internalSize;
 
     /* Session Management */
     LIST_HEAD(session_list, session_list_entry) sessions;
@@ -258,7 +284,27 @@ struct UA_Server {
 
     /* GDS Manager for certificate management */
     UA_GDSManager gdsManager;
+
+#ifdef UA_ENABLE_RBAC
+    /* Internal role-permission configurations. Nodes reference entries
+     * in this array via their permissionIndex field. Entries from the
+     * initial config presets have refCount set to
+     * UA_ROLEPERMISSIONS_REFCOUNT_PROTECTED and are never deleted. */
+    size_t rolePermissionsSize;
+    UA_RolePermissionEntry *rolePermissions;
+
+    /* Internal role registry. Roles from the config are marked as
+     * protected and cannot be removed at runtime. */
+    size_t rolesSize;
+    UA_Role *roles;
+    UA_Boolean *rolesProtected; /* Parallel array: true for config roles */
+#endif
 };
+
+/* In case the configuration was updated. Make the ->next pointer in the
+ * internal customTypes point into the configuration. */
+const UA_DataTypeArray *
+serverCustomTypes(UA_Server *server);
 
 /***********************/
 /* References Handling */
@@ -283,11 +329,14 @@ ZIP_FUNCTIONS(UA_ReferenceNameTree, UA_ReferenceTargetTreeElem, nameTreeEntry,
 /* SecureChannel Handling */
 /**************************/
 
-/* Session and channel can be NULL, only used for logging.
- * Ad can be NULL, then the ApplicationUri is not checked. */
+/* Validate the certificate using the CertificateGroup and generate the
+ * appropriate audit events if the validation fails. If the session is non-NULL,
+ * then it gets used for logging. The ApplicationDescription can also be NULL.
+ * Then the ApplicationUri doesn't get checked against the certificate. */
 UA_StatusCode
 validateCertificate(UA_Server *server, UA_CertificateGroup *cg,
                     UA_SecureChannel *channel, UA_Session *session,
+                    const char *logPrefix,
                     const UA_ApplicationDescription *ad,
                     const UA_ByteString certificate);
 
@@ -388,6 +437,74 @@ findChildByBrowsename(UA_Server *server, UA_Session *session,
 /* Utility Functions */
 /*********************/
 
+#ifdef UA_ENABLE_AUDITING
+void
+auditOpenSecureChannelEvent(UA_Server *server, UA_SecureChannel *channel,
+                            const UA_OpenSecureChannelRequest *req,
+                            const UA_OpenSecureChannelResponse *resp);
+
+void
+auditCloseSecureChannelEvent(UA_Server *server, UA_SecureChannel *channel);
+
+void
+auditCreateSessionEvent(UA_Server *server, UA_SecureChannel *channel,
+                        UA_Session *session, const UA_CreateSessionRequest *req,
+                        const UA_CreateSessionResponse *resp);
+
+void
+auditActivateSessionEvent(UA_Server *server, UA_SecureChannel *channel, UA_Session *session,
+                          const UA_ActivateSessionRequest *req,
+                          const UA_ActivateSessionResponse *resp);
+
+void
+auditCloseSessionEvent(UA_Server *server, UA_Session *session);
+
+void
+auditCancelEvent(UA_Server *server, UA_SecureChannel *channel, UA_Session *session,
+                 UA_Boolean status, UA_StatusCode statusCodeId, UA_UInt32 requestHandle);
+
+void
+auditCertificateEvent(UA_Server *server, UA_ApplicationNotificationType type,
+                      UA_SecureChannel *channel, UA_Session *session,
+                      const char *serviceName, UA_StatusCode statusCodeId,
+                      UA_ByteString certificate, UA_String message);
+
+void
+auditCertificateDataMismatchEvent(UA_Server *server,
+                                  UA_SecureChannel *channel, UA_Session *session,
+                                  const char *serviceName, UA_StatusCode statusCodeId,
+                                  UA_ByteString certificate, UA_String invalidUri);
+
+void
+auditAddNodesEvent(UA_Server *server, UA_SecureChannel *channel, UA_Session *session,
+                   UA_Boolean status, size_t itemsSize, UA_AddNodesItem *items);
+
+void
+auditDeleteNodesEvent(UA_Server *server, UA_SecureChannel *channel, UA_Session *session,
+                      UA_Boolean status, size_t itemsSize, UA_DeleteNodesItem *items);
+
+void
+auditAddReferencesEvent(UA_Server *server, UA_SecureChannel *channel, UA_Session *session,
+                        UA_Boolean status, size_t itemsSize, UA_AddReferencesItem *items);
+
+void
+auditDeleteReferencesEvent(UA_Server *server, UA_SecureChannel *channel, UA_Session *session,
+                           UA_Boolean status, size_t itemsSize, UA_DeleteReferencesItem *items);
+
+void
+auditWriteUpdateEvent(UA_Server *server, UA_SecureChannel *channel, UA_Session *session,
+                      UA_Boolean status, const UA_NodeId *sourceNode,
+                      UA_UInt32 attributeId, const UA_String indexRange,
+                      const UA_Variant *newValue, const UA_Variant *oldValue);
+
+void
+auditMethodUpdateEvent(UA_Server *server, UA_SecureChannel *channel, UA_Session *session,
+                       UA_Boolean status, const UA_NodeId *sourceNode,
+                       const UA_NodeId *methodNode, UA_StatusCode statusCodeId,
+                       size_t inputsSize, UA_Variant *inputs,
+                       size_t outputsSize, UA_Variant *outputs);
+#endif
+
 void setServerLifecycleState(UA_Server *server, UA_LifecycleState state);
 
 void setupNs1Uri(UA_Server *server);
@@ -450,10 +567,14 @@ isConditionOrBranch(UA_Server *server,
 
 #endif /* UA_ENABLE_SUBSCRIPTIONS_ALARMS_CONDITIONS */
 
-/* Returns the type node from the node on the stack top. The type node is pushed
- * on the stack and returned. */
+/* Returns the first "HasTypeDefinition" or "HasSubtype" reference to the
+ * (parent) type. Some types have very many instances. If the type is created
+ * ad-hoc by the Nodestore, the attributeMask and reference characterization can
+ * be used to return only relevant attributes/references. */
 const UA_Node *
-getNodeType(UA_Server *server, const UA_NodeHead *nodeHead);
+getNodeType(UA_Server *server, const UA_NodeHead *nodeHead,
+            UA_UInt32 attributeMask, UA_ReferenceTypeSet references,
+            UA_BrowseDirection referenceDirections);
 
 /* Returns whether the response is done (async call or not) */
 UA_Boolean
@@ -587,8 +708,11 @@ UA_SecurityPolicy *
 getDefaultEncryptedSecurityPolicy(UA_Server *server,
                                   UA_SecurityPolicyType type);
 
+/* If the channel is non-NULL, then only compatible endpoints are returned.
+ * Depending on ECC/RSA for the SecurityPolicy of the existing channel. */
 UA_StatusCode
-setCurrentEndPointsArray(UA_Server *server, const UA_String endpointURL,
+setCurrentEndPointsArray(UA_Server *server, UA_SecureChannel *channel,
+                         const UA_String endpointUrl,
                          UA_String *profileUris, size_t profileUrisSize,
                          UA_EndpointDescription **arr, size_t *arrSize);
 
@@ -928,14 +1052,6 @@ UA_Session_getNodeDisplayName(const UA_Session *session,
 UA_LocalizedText
 UA_Session_getNodeDescription(const UA_Session *session,
                               const UA_NodeHead *head);
-
-UA_StatusCode
-UA_Node_insertOrUpdateDisplayName(UA_NodeHead *head,
-                                  const UA_LocalizedText *value);
-
-UA_StatusCode
-UA_Node_insertOrUpdateDescription(UA_NodeHead *head,
-                                  const UA_LocalizedText *value);
 
 _UA_END_DECLS
 

@@ -298,7 +298,7 @@ checkAdjustMonitoredItemParams(UA_Server *server, UA_Session *session,
             UA_NODESTORE_RELEASE(server, node);
         }
     }
-        
+
 
     /* A negative number indicates that the sampling interval is the publishing
      * interval of the Subscription. Note that the sampling interval selected
@@ -408,7 +408,7 @@ notifyMonitoredItem(UA_Server *server, UA_MonitoredItem *mon,
     }
     UA_Variant_setScalar(&notifyMonData[11].value, &mon->parameters.queueSize,
                          &UA_TYPES[UA_TYPES_UINT32]);
-    UA_Variant_setScalar(&notifyMonData[11].value, &mon->parameters.discardOldest,
+    UA_Variant_setScalar(&notifyMonData[12].value, &mon->parameters.discardOldest,
                          &UA_TYPES[UA_TYPES_BOOLEAN]);
 
     /* Notify the application */
@@ -913,7 +913,7 @@ Operation_SetMonitoringMode(UA_Server *server, UA_Session *session,
     }
     *result = UA_MonitoredItem_setMonitoringMode(server, mon, smc->monitoringMode);
 
-    if(result == UA_STATUSCODE_GOOD)
+    if(*result == UA_STATUSCODE_GOOD)
         notifyMonitoredItem(server, mon, UA_APPLICATIONNOTIFICATIONTYPE_MONITOREDITEM_MONITORINGMODE);
 }
 

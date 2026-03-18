@@ -202,7 +202,7 @@ UA_StatusCode_isBad(UA_StatusCode code) {
 
 UA_Boolean
 UA_StatusCode_isUncertain(UA_StatusCode code) {
-    return (((code >> 30) == 0x01) && ((code >> 30) < 0x02));
+    return ((code >> 30) == 0x01);
 }
 
 UA_Boolean
@@ -744,7 +744,7 @@ UA_ByteString_allocBuffer(UA_ByteString *bs, size_t length) {
         bs->data = (u8*)UA_EMPTY_ARRAY_SENTINEL;
         return UA_STATUSCODE_GOOD;
     }
-    bs->data = (u8*)UA_malloc(length);
+    bs->data = (u8*)UA_calloc(1,length);
     if(UA_UNLIKELY(!bs->data))
         return UA_STATUSCODE_BADOUTOFMEMORY;
     bs->length = length;
