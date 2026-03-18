@@ -9,39 +9,85 @@
 
 #include <pthread.h>
 #include <stdbool.h>
-#include <string.h>
 #include <unistd.h>  // close()
 
 #include <arpa/inet.h>  // inet_pton()
 #include <sys/socket.h>
 
 void
-testPrimary(UA_Boolean const *isPrimary, State_s *state);
+testPrimary(UA_Boolean const *isPrimary, RedundancyState_s *state);
+
+UA_Boolean lastState = -1;
+/* lastState not equal to UA_TRUE or UA_FALSE allows
+entering the loop to enable/disable writergroup starting as either primary
+or backup */
 
 UA_StatusCode
-syncState(State_s *state) {
+syncState(RedundancyState_s *state, UA_Boolean *isPrimary, UA_Server *server, UA_NodeId writerGroupIdent) {
     // Implement the logic to synchronize the state with the server
     // Example implementation:
     // send_heartbeat(state->server_ip, state->server_port);
+    // 
+    if(*isPrimary != lastState) {
+
+        if(*isPrimary) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                         "Becoming PRIMARY -> start publishing %d \n", *isPrimary);
+
+            UA_StatusCode rv = UA_Server_setWriterGroupSequenceNumber(
+                server, writerGroupIdent, state->nmSequenceNr);
+            if(rv == UA_STATUSCODE_GOOD) {
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                            "WriterGroup sequence number set to %u", state->nmSequenceNr);
+            } else {
+                UA_LOG_WARNING(
+                    UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                    "Failed to set WriterGroup sequence number, StatusCode: 0x%08x",
+                    rv);
+            }
+            UA_Server_setWriterGroupOperational(server, writerGroupIdent);
+        } else {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                         "Becoming BACKUP -> stop publishing");
+
+            UA_Server_setWriterGroupDisabled(server, writerGroupIdent);
+        }
+
+        lastState = *isPrimary;
+    }
+
+    if(*isPrimary) {
+        UA_UInt16 seq = 0;
+        UA_StatusCode rv =
+            UA_Server_getWriterGroupSequenceNumber(server, writerGroupIdent, &seq);
+        if(rv == UA_STATUSCODE_GOOD) {
+            state->nmSequenceNr = seq;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                        "Current sequence number: %u", seq);
+        } else {
+            UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                           "Failed to get sequence number, StatusCode: 0x%08x", rv);
+        }
+    }
 
     return UA_STATUSCODE_GOOD;
 }
 
 void
-testPrimary(UA_Boolean const *isPrimary, State_s *state) {
+testPrimary(UA_Boolean const *isPrimary, RedundancyState_s *state) {
     while(1) {
         if(*isPrimary)
-            state->state += 1;
+            state->states.state += 1;
 
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "isPrimary: %d, Sequence number: %d",
-                    *isPrimary, state->state);
+                    *isPrimary, state->states.state);
 
         sleep(1);
     }
 }
 
 UA_StatusCode
-init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
+init(UA_Boolean *isPrimary, RedundancyState_s *state, heartbeatConfig_s *config) {
     int sockfd = 0;
 
     pthread_t heartbeatThread;
@@ -74,35 +120,4 @@ init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config) {
     return UA_STATUSCODE_GOOD;
 }
 
-int
-main(int argc, char *argv[]) {
-    const int port = 10001;
-    UA_Boolean isPrimary = UA_FALSE;
-    char redDcnIp[IPADDRLEN] = "127.0.0.1";
-    State_s state = {.state = (UA_Int64)MAGICNUMBER};
 
-    if(argc == 3) {
-        strcpy(redDcnIp, argv[2]);
-        
-        if(strcmp(argv[1], "--primary") == 0)
-            isPrimary = UA_TRUE;
-        else if(strcmp(argv[1], "--backup") == 0)
-            isPrimary = UA_FALSE;
-        else {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Invalid argument: %s", argv[1]);
-            return -1;
-        }
-    } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Usage: %s [--primary | --backup] <redundancy Controller IP>", argv[0]);
-        return -1;
-    }
-
-    connectionConfig_s config = {
-        .port = &port,
-        .ipAddress = redDcnIp,
-    };
-
-    init(&isPrimary, &state, &config);
-
-    return 0;
-}

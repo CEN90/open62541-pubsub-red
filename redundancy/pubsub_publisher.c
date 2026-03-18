@@ -12,6 +12,11 @@
 static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
     dataSetWriterIdent;
 
+typedef struct {
+    UA_Boolean *isPrimary;
+    UA_Int64 *val;
+} cb_t;
+
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
                     UA_NetworkAddressUrlDataType *networkAddressUrl) {
@@ -146,15 +151,17 @@ addDataSetWriter(UA_Server *server) {
 
 static void
 updateFakeValue(UA_Server *server, void *data) {
-    UA_Int64 *fakeValue = (UA_Int64 *)data;
+    cb_t *cbData = (cb_t *)data;
 
-    (*fakeValue)++;
+    if(*cbData->isPrimary) {
+        cbData->val += 1;
 
-    UA_Variant value;
-    UA_Variant_init(&value);
+        UA_Variant value;
+        UA_Variant_init(&value);
 
-    UA_Variant_setScalar(&value, fakeValue, &UA_TYPES[UA_TYPES_INT64]);
-    UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
+        UA_Variant_setScalar(&value, cbData->val, &UA_TYPES[UA_TYPES_INT64]);
+        UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
+    }
 }
 
 void *
@@ -162,11 +169,6 @@ runPublisher(void *data) {
     cbstruct_s *stateStruct = (cbstruct_s *)data;
     UA_Boolean *isPrimary = stateStruct->isPrimary;
     State_s *state = stateStruct->data;
-
-    UA_Boolean lastState = 2;
-    /* lastState not equal to UA_TRUE or UA_FALSE allows
-    entering the loop to enable/disable writergroup starting as either primary
-    or backup */
 
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *config = UA_Server_getConfig(server);
@@ -187,54 +189,17 @@ runPublisher(void *data) {
     addWriterGroup(server);
     addDataSetWriter(server);
 
-    UA_Server_addRepeatedCallback(server, updateFakeValue, &fakeValue,
+    cb_t callbackData = {isPrimary, &fakeValue};
+
+    UA_Server_addRepeatedCallback(server, updateFakeValue, &callbackData,
                                   PUBLISHER_PUBLISHINGINTERVAL, NULL);
 
     UA_Server_enableAllPubSubComponents(server);
 
+    init(state, isPrimary, server, writerGroupIdent);
+
     while(true) {
-
-        if(*isPrimary != lastState) {
-
-            if(*isPrimary) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                             "Becoming PRIMARY -> start publishing %d \n", *isPrimary);
-
-                UA_StatusCode rv = UA_Server_setWriterGroupSequenceNumber(
-                    server, writerGroupIdent, state->state);
-                if(rv == UA_STATUSCODE_GOOD) {
-                    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                                "WriterGroup sequence number set to %u", state->state);
-                } else {
-                    UA_LOG_WARNING(
-                        UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                        "Failed to set WriterGroup sequence number, StatusCode: 0x%08x",
-                        rv);
-                }
-                UA_Server_setWriterGroupOperational(server, writerGroupIdent);
-            } else {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                             "Becoming BACKUP -> stop publishing");
-
-                UA_Server_setWriterGroupDisabled(server, writerGroupIdent);
-            }
-
-            lastState = *isPrimary;
-        }
-
-        if(*isPrimary) {
-            UA_UInt16 seq = 0;
-            UA_StatusCode rv =
-                UA_Server_getWriterGroupSequenceNumber(server, writerGroupIdent, &seq);
-            if(rv == UA_STATUSCODE_GOOD) {
-                state->state = seq;
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                            "Current sequence number: %u", seq);
-            } else {
-                UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                               "Failed to get sequence number, StatusCode: 0x%08x", rv);
-            }
-        }
+        UA_StatusCode retval = syncState(state, isPrimary, server, writerGroupIdent);
 
         UA_Server_run_iterate(server, true);
     }

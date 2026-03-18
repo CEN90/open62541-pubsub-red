@@ -9,20 +9,25 @@
 #define IPADDRLEN 16
 
 typedef struct {
-    UA_UInt16 state;
-} State_s;
+    UA_Int16 nmSequenceNr;
+    UA_Int16 dsmSequenceNr;
+
+    size_t applicationStatesSize;
+    UA_KeyValuePair *applicationStates;
+} RedundancyState_s;
 
 typedef struct {
     const int *port;
     const char *ipAddress;
-} connectionConfig_s;
+} heartbeatConfig_s;
 
 extern UA_Boolean isPrimary;
 
 UA_StatusCode
-syncState(State_s *state);
+syncState(RedundancyState_s *state, UA_Boolean *isPrimary, UA_Server *server,
+          UA_NodeId writerGroupIdent);
 
 UA_StatusCode
-init(UA_Boolean *isPrimary, State_s *state, connectionConfig_s *config);
+init(UA_Boolean *isPrimary, RedundancyState_s *state, heartbeatConfig_s *config);
 
 #endif
