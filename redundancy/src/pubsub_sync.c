@@ -8,18 +8,16 @@
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
 
-
+#include "../include/redundancy_state.h"
 
 static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
     dataSetWriterIdent, readerGroupIdentifier, readerIdentifier;
 
 static UA_DataSetReaderConfig readerConfig;
 static UA_Boolean lastIsPrimary = UA_FALSE;
+UA_DataType RedundancyStateType;
 
-void
-initRedundancyStateType(void) {
-    RedundancyStateType.typeId = UA_NODEID_STRING(1, "RedundancyState");
-}
+
 
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
@@ -64,6 +62,7 @@ addStateVariable(UA_Server *server, RedundancyState_s *stateStruct) {
     attr.dataType = RedundancyStateType.typeId;
     attr.valueRank = -1;
     UA_Variant value;
+    UA_Variant_init(&value);
 
     UA_Variant_setScalar(&value, stateStruct, &RedundancyStateType);
     attr.value = value;
@@ -93,7 +92,7 @@ addStateDataField(UA_Server *server, RedundancyState_s *stateStruct,
     dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("state");
     dataSetFieldConfig.field.variable.promotedField = UA_FALSE;
     dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
-        addStateVariable(server, stateStruct);
+        *stateNodeId;
     dataSetFieldConfig.field.variable.publishParameters.attributeId =
         UA_ATTRIBUTEID_VALUE;
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldConfig,
@@ -348,9 +347,12 @@ setSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_Variant_setScalar(&value, &stateStruct, &RedundancyStateType);
+    UA_Variant_setScalar(&value, stateStruct, &RedundancyStateType);
     UA_StatusCode retval =
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "state"), value);
+
+    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "typeId: %d",
+                 RedundancyStateType.typeId);
 
     if(retval != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
@@ -431,7 +433,8 @@ runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddr
 
     UA_ServerConfig_setDefault(config);
 
-    initRedundancyStateType();
+    getRedundancyState(&RedundancyStateType, UA_NODEID_STRING(1, "RedundancyState"));
+
     UA_Server_addDataType(server, UA_NODEID_NUMERIC(0, UA_NS0ID_STRUCTURE),
                           &RedundancyStateType);
 

@@ -206,6 +206,14 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
 
     UA_Server_enableAllPubSubComponents(server);
 
+    UA_Variant fakeValueVariant;
+    UA_Variant_init(&fakeValueVariant);
+    UA_Variant_setScalarCopy(&fakeValueVariant, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
+    UA_KeyValuePair *kp = UA_KeyValuePair_new();
+    kp->value = fakeValueVariant;
+    kp->key = UA_QUALIFIEDNAME(1, "FakeNews");
+    state.applicationStates[0] = *kp;
+    
     init(isPrimary, &state, hb_config);
 
     while(true) {

@@ -835,4 +835,36 @@ UA_Server_updateDataSetWriterConfig(UA_Server *server, const UA_NodeId dswId,
     return res;
 }
 
+UA_StatusCode
+UA_Server_getDataSetWriterSequenceNumber(UA_Server *server,
+                                         const UA_NodeId dataSetWriterId,
+                                         UA_UInt16 *dswSequenceNumber) {
+    if(!server || !dswSequenceNumber)
+        return UA_STATUSCODE_BADINVALIDARGUMENT;
+
+    UA_PubSubManager *psm = getPSM(server);
+    UA_DataSetWriter *dsw = (psm) ? UA_DataSetWriter_find(psm, dataSetWriterId) : NULL;
+    if(!dsw)
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    *dswSequenceNumber = dsw->actualDataSetMessageSequenceCount;
+    return UA_STATUSCODE_GOOD;
+}
+
+UA_StatusCode
+UA_Server_setDataSetWriterSequenceNumber(UA_Server *server,
+                                         const UA_NodeId dataSetWriterId,
+                                         UA_UInt16 dswSequenceNumber) {
+    if(!server)
+        return UA_STATUSCODE_BADINVALIDARGUMENT;
+
+    UA_PubSubManager *psm = getPSM(server);
+    UA_DataSetWriter *dsw = (psm) ? UA_DataSetWriter_find(psm, dataSetWriterId) : NULL;
+    if(!dsw)
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    dsw->actualDataSetMessageSequenceCount = dswSequenceNumber;
+    return UA_STATUSCODE_GOOD;
+}
+
 #endif /* UA_ENABLE_PUBSUB */

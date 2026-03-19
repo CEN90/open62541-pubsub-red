@@ -13,4 +13,7 @@ typedef struct {
 
 extern UA_DataType RedundancyStateType;
 
+void
+getRedundancyState(UA_DataType *type, UA_NodeId typeNodeId);
+
 #endif
