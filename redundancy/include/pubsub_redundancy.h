@@ -21,10 +21,12 @@ typedef struct {
 extern UA_Boolean isPrimary;
 
 UA_StatusCode
-syncState(RedundancyState_s *state, UA_Boolean const *isPrimary, UA_Server *server,
-          UA_NodeId writerGroupIdent, UA_NodeId dataSetWriterId);
+syncState(UA_Boolean const *isPrimary, UA_Server *server,
+          UA_NodeId writerGroupIdent, UA_NodeId dataSetWriterId, 
+          size_t appStateSize, UA_KeyValuePair *applicationStates);
 
 UA_StatusCode
-init(UA_Boolean *isPrimary, RedundancyState_s *state, HeartbeatConfig *config);
+initStateSync(UA_Boolean *isPrimary, HeartbeatConfig *config, size_t appStateVars,
+    UA_KeyValuePair *applicationStates);
 
 #endif

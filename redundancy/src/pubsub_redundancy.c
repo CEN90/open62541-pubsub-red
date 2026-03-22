@@ -8,48 +8,47 @@
 
 #include <pthread.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <unistd.h>  // close()
 
 #include "../include/pubsub_sync.h"
 #include <arpa/inet.h>  // inet_pton()
 #include <sys/socket.h>
 
-void
-testPrimary(UA_Boolean const *isPrimary, RedundancyState_s *state);
 
 UA_Boolean lastState = -1;
-/* lastState not equal to UA_TRUE or UA_FALSE allows
-entering the loop to enable/disable writergroup starting as either primary
-or backup */
+RedundancyState_s state;
+
 
 UA_StatusCode
-syncState(RedundancyState_s *state, UA_Boolean const *isPrimary, UA_Server *server,
-          UA_NodeId writerGroupIdent, UA_NodeId dataSetWriterId) {
+syncState(UA_Boolean const *isPrimary, UA_Server *server,
+          UA_NodeId writerGroupIdent, UA_NodeId dataSetWriterId,
+          size_t appStateSize, UA_KeyValuePair *applicationStates) {
 
     if(*isPrimary != lastState) {
         if(*isPrimary) {
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                          "syncState: PRIMARY -> start publishing %d \n", *isPrimary);
 
-            UA_StatusCode rv = UA_Server_setWriterGroupSequenceNumber(
-                server, writerGroupIdent, state->nmSequenceNr);
-            if(rv == UA_STATUSCODE_GOOD) {
+            UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(
+                server, writerGroupIdent, state.nmSequenceNr);
+            if(retval == UA_STATUSCODE_GOOD) {
                 UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                              "syncState: WriterGroup sequence number set to %u",
-                             state->nmSequenceNr);
+                             state.nmSequenceNr);
             } else {
                 UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                                "syncState: Failed to set WriterGroup sequence number, "
                                "StatusCode: 0x%08x",
-                               rv);
+                               retval);
             }
-            rv = UA_Server_setDataSetWriterSequenceNumber(server, dataSetWriterId,
-                                                          state->dswSequenceNr);
-            if(rv != UA_STATUSCODE_GOOD) {
+            retval= UA_Server_setDataSetWriterSequenceNumber(server, dataSetWriterId,
+                                                          state.dswSequenceNr);
+            if(retval!= UA_STATUSCODE_GOOD) {
                 UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                                "syncState: Failed to set DataSetWriter sequence number, "
                                "StatusCode: 0x%08x",
-                               rv);
+                               retval);
             }
 
             UA_Server_setWriterGroupOperational(server, writerGroupIdent);
@@ -65,29 +64,30 @@ syncState(RedundancyState_s *state, UA_Boolean const *isPrimary, UA_Server *serv
 
     if(*isPrimary) {
         UA_UInt16 seq = 0;
-        UA_StatusCode rv =
+        UA_StatusCode retval=
             UA_Server_getWriterGroupSequenceNumber(server, writerGroupIdent, &seq);
 
-        if(rv == UA_STATUSCODE_GOOD) {
-            state->nmSequenceNr = seq;
+        if(retval== UA_STATUSCODE_GOOD) {
+            state.nmSequenceNr = seq;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                         "syncState: Current sequence number: %u", seq);
         } else {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "syncState: Failed to get sequence number, StatusCode: 0x%08x",
-                           rv);
+                           retval);
         }
 
-        rv = UA_Server_getDataSetWriterSequenceNumber(server, dataSetWriterId, &seq);
-        if(rv == UA_STATUSCODE_GOOD) {
-            state->dswSequenceNr = seq;
+        retval= UA_Server_getDataSetWriterSequenceNumber(server, dataSetWriterId, &seq);
+
+        if(retval== UA_STATUSCODE_GOOD) {
+            state.dswSequenceNr = seq;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                         "syncState: Current DataSetWriter sequence number: %u", seq);
         } else {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "syncState: Failed to get DataSetWriter sequence number, "
                            "StatusCode: 0x%08x",
-                           rv);
+                           retval);
         }
     }
 
@@ -95,14 +95,20 @@ syncState(RedundancyState_s *state, UA_Boolean const *isPrimary, UA_Server *serv
 }
 
 UA_StatusCode
-init(UA_Boolean *isPrimary, RedundancyState_s *state, HeartbeatConfig *config) {
+initStateSync(UA_Boolean *isPrimary, HeartbeatConfig *config, size_t appStateVars,
+    UA_KeyValuePair *applicationStates) {
     int sockfd = 0;
 
     pthread_t heartbeatThread;
     pthread_t syncThread;
 
+    state.nmSequenceNr = 0;
+    state.dswSequenceNr = 0;
+    state.applicationStatesSize = appStateVars;
+    state.applicationStates = applicationStates;
+
     cbstruct_s stateStruct = {
-        .data = state,
+        .data = &state,
         .isPrimary = isPrimary,
     };
 
@@ -119,4 +125,3 @@ init(UA_Boolean *isPrimary, RedundancyState_s *state, HeartbeatConfig *config) {
     close(sockfd);
     return UA_STATUSCODE_GOOD;
 }
-

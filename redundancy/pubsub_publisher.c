@@ -183,13 +183,14 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     UA_NetworkAddressUrlDataType networkAddressUrl = {
         UA_STRING_NULL, UA_STRING("opc.udp://224.0.0.22:4842/")};
 
-    RedundancyState_s state;
-    state.nmSequenceNr = 0;
-    state.dswSequenceNr = 0;
-    state.applicationStatesSize = N;
-    state.applicationStates =
-        (UA_KeyValuePair *)UA_Array_new(N, &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+    UA_Variant fakeValueVariant;
+    UA_Variant_init(&fakeValueVariant);
+    UA_Variant_setScalarCopy(&fakeValueVariant, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
+    UA_KeyValuePair *kp = UA_KeyValuePair_new();
 
+    kp->value = fakeValueVariant;
+    kp->key = UA_QUALIFIEDNAME(1, "FakeNews");
+    
     // common
     addPubSubConnection(server, &transportProfile, &networkAddressUrl);
 
@@ -205,20 +206,13 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
                                   PUBLISHER_PUBLISHINGINTERVAL, NULL);
 
     UA_Server_enableAllPubSubComponents(server);
-
-    UA_Variant fakeValueVariant;
-    UA_Variant_init(&fakeValueVariant);
-    UA_Variant_setScalarCopy(&fakeValueVariant, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
-    UA_KeyValuePair *kp = UA_KeyValuePair_new();
-    kp->value = fakeValueVariant;
-    kp->key = UA_QUALIFIEDNAME(1, "FakeNews");
-    state.applicationStates[0] = *kp;
     
-    init(isPrimary, &state, hb_config);
+    initStateSync(isPrimary, hb_config, 1, kp);
 
+    // Busy wait, refactor to cb?
     while(true) {
         UA_StatusCode retval =
-            syncState(&state, isPrimary, server, writerGroupIdent, dataSetWriterIdent);
+            syncState(isPrimary, server, writerGroupIdent, dataSetWriterIdent, 1, kp);
 
         UA_Server_run_iterate(server, true);
     }
