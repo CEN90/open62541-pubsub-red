@@ -21,8 +21,7 @@ RedundancyState_s state;
 
 
 UA_StatusCode
-syncState(UA_Boolean const *isPrimary, UA_Server *server,
-          UA_NodeId writerGroupIdent, UA_NodeId dataSetWriterId,
+syncState(UA_NodeId writerGroupIdent, UA_NodeId dataSetWriterId,
           size_t appStateSize, UA_KeyValuePair *applicationStates) {
 
     if(*isPrimary != lastState) {
@@ -42,9 +41,9 @@ syncState(UA_Boolean const *isPrimary, UA_Server *server,
                                "StatusCode: 0x%08x",
                                retval);
             }
-            retval= UA_Server_setDataSetWriterSequenceNumber(server, dataSetWriterId,
+            retval = UA_Server_setDataSetWriterSequenceNumber(server, dataSetWriterId,
                                                           state.dswSequenceNr);
-            if(retval!= UA_STATUSCODE_GOOD) {
+            if(retval != UA_STATUSCODE_GOOD) {
                 UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                                "syncState: Failed to set DataSetWriter sequence number, "
                                "StatusCode: 0x%08x",
@@ -64,10 +63,10 @@ syncState(UA_Boolean const *isPrimary, UA_Server *server,
 
     if(*isPrimary) {
         UA_UInt16 seq = 0;
-        UA_StatusCode retval=
+        UA_StatusCode retval =
             UA_Server_getWriterGroupSequenceNumber(server, writerGroupIdent, &seq);
 
-        if(retval== UA_STATUSCODE_GOOD) {
+        if(retval == UA_STATUSCODE_GOOD) {
             state.nmSequenceNr = seq;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                         "syncState: Current sequence number: %u", seq);
@@ -77,9 +76,9 @@ syncState(UA_Boolean const *isPrimary, UA_Server *server,
                            retval);
         }
 
-        retval= UA_Server_getDataSetWriterSequenceNumber(server, dataSetWriterId, &seq);
+        retval = UA_Server_getDataSetWriterSequenceNumber(server, dataSetWriterId, &seq);
 
-        if(retval== UA_STATUSCODE_GOOD) {
+        if(retval == UA_STATUSCODE_GOOD) {
             state.dswSequenceNr = seq;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                         "syncState: Current DataSetWriter sequence number: %u", seq);
@@ -95,9 +94,11 @@ syncState(UA_Boolean const *isPrimary, UA_Server *server,
 }
 
 UA_StatusCode
-initStateSync(UA_Boolean *isPrimary, HeartbeatConfig *config, size_t appStateVars,
-    UA_KeyValuePair *applicationStates) {
+initStateSync(UA_Boolean *_isPrimary, UA_Server *_server, HeartbeatConfig *config,
+            size_t appStateVars, UA_KeyValuePair *applicationStates) {
     int sockfd = 0;
+    isPrimary = _isPrimary;
+    server = _server;
 
     pthread_t heartbeatThread;
     pthread_t syncThread;
@@ -109,7 +110,7 @@ initStateSync(UA_Boolean *isPrimary, HeartbeatConfig *config, size_t appStateVar
 
     cbstruct_s stateStruct = {
         .data = &state,
-        .isPrimary = isPrimary,
+        .isPrimary = _isPrimary,
     };
 
     if(config->sockfd == NULL) {
