@@ -21,9 +21,7 @@ RedundancyState_s state;
 
 
 UA_StatusCode
-syncState(UA_NodeId writerGroupIdent, UA_NodeId dataSetWriterId,
-          size_t appStateSize, UA_KeyValuePair *applicationStates) {
-
+syncState(size_t appStateSize, UA_KeyValuePair *applicationStates) {
     if(*isPrimary != lastState) {
         if(*isPrimary) {
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
@@ -94,11 +92,15 @@ syncState(UA_NodeId writerGroupIdent, UA_NodeId dataSetWriterId,
 }
 
 UA_StatusCode
-initStateSync(UA_Boolean *_isPrimary, UA_Server *_server, HeartbeatConfig *config,
-            size_t appStateVars, UA_KeyValuePair *applicationStates) {
-    int sockfd = 0;
-    isPrimary = _isPrimary;
+initStateSync(UA_Boolean *_isPrimary, UA_Server *_server, 
+            HeartbeatConfig *config, UA_NodeId _writerGroupIdent, 
+            UA_NodeId _dataSetWriterId, size_t appStateVars, 
+            UA_KeyValuePair *applicationStates) {
     server = _server;
+    isPrimary = _isPrimary;
+    dataSetWriterId = _dataSetWriterId;
+    writerGroupIdent = _writerGroupIdent;
+    int sockfd = 0;
 
     pthread_t heartbeatThread;
     pthread_t syncThread;

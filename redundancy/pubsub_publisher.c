@@ -207,18 +207,18 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
 
     UA_Server_enableAllPubSubComponents(server);
     
-    initStateSync(isPrimary, server, hb_config, 1, kp);
+    initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterId, 1, kp);
 
     // Busy wait, refactor to cb?
     while(true) {
         UA_StatusCode retval =
-            syncState(writerGroupIdent, dataSetWriterIdent, 1, kp);
+            syncState(1, kp);
 
         UA_Server_run_iterate(server, true);
     }
 
     UA_Server_delete(server);
-}
+} 
 
 int
 main(int argc, char *argv[]) {
