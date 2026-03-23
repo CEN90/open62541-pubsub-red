@@ -168,6 +168,7 @@ updateFakeValue(UA_Server *server, void *data) {
 
         UA_Variant_setScalar(&value, cbData->val, &UA_TYPES[UA_TYPES_INT64]);
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %lld", cbData->val);
     }
 }
 
@@ -190,7 +191,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
 
     kp->value = fakeValueVariant;
     kp->key = UA_QUALIFIEDNAME(1, "FakeNews");
-    
+
     // common
     addPubSubConnection(server, &transportProfile, &networkAddressUrl);
 
@@ -206,19 +207,18 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
                                   PUBLISHER_PUBLISHINGINTERVAL, NULL);
 
     UA_Server_enableAllPubSubComponents(server);
-    
+
     initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterId, 1, kp);
 
     // Busy wait, refactor to cb?
     while(true) {
-        UA_StatusCode retval =
-            syncState(1, kp);
+        syncState(1, kp); // use retval later
 
         UA_Server_run_iterate(server, true);
     }
 
     UA_Server_delete(server);
-} 
+}
 
 int
 main(int argc, char *argv[]) {

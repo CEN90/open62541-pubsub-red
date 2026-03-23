@@ -355,12 +355,13 @@ setSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
     if(retval != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                      "Failed to write RedundancyState: 0x%08x", retval);
-    } else {
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                    "RedundancyState written: nmSeq=%d dsmSeq=%d arraySize=%lu",
-                    stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
-                    (unsigned long)stateStruct->applicationStatesSize);
-    }
+    } 
+    // else {
+    //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+    //                 "RedundancyState written: nmSeq=%d dsmSeq=%d arraySize=%lu",
+    //                 stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
+    //                 (unsigned long)stateStruct->applicationStatesSize);
+    // }
 }
 
 static void

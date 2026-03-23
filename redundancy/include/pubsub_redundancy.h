@@ -7,7 +7,6 @@
 #include <open62541/util.h>
 
 #include "pubsub_heartbeat.h"
-#include "redundancy_state.h"
 
 
 
@@ -27,9 +26,9 @@ UA_StatusCode
 syncState(size_t appStateSize, UA_KeyValuePair *applicationStates);
 
 UA_StatusCode
-initStateSync(UA_Boolean *_isPrimary, UA_Server *_server, 
-            HeartbeatConfig *config, UA_NodeId _writerGroupIdent, 
-            UA_NodeId _dataSetWriterId, size_t appStateVars, 
+initStateSync(UA_Boolean *_isPrimary, UA_Server *_server,
+            HeartbeatConfig *config, UA_NodeId _writerGroupIdent,
+            UA_NodeId _dataSetWriterId, size_t appStateVars,
             UA_KeyValuePair *applicationStates);
 
 #endif
