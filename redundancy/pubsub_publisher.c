@@ -161,14 +161,14 @@ updateFakeValue(UA_Server *server, void *data) {
     cb_t *cbData = (cb_t *)data;
 
     if(*cbData->isPrimary) {
-        cbData->val += 1;
+        *(cbData->val) += 1;
 
         UA_Variant value;
         UA_Variant_init(&value);
 
         UA_Variant_setScalar(&value, cbData->val, &UA_TYPES[UA_TYPES_INT64]);
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %lld", cbData->val);
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %d", *(cbData->val));
     }
 }
 
@@ -186,7 +186,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
 
     UA_Variant fakeValueVariant;
     UA_Variant_init(&fakeValueVariant);
-    UA_Variant_setScalarCopy(&fakeValueVariant, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
+    UA_Variant_setScalar(&fakeValueVariant, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
     UA_KeyValuePair *kp = UA_KeyValuePair_new();
 
     kp->value = fakeValueVariant;
@@ -208,7 +208,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
 
     UA_Server_enableAllPubSubComponents(server);
 
-    initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterId, 1, kp);
+    initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, 1, kp);
 
     // Busy wait, refactor to cb?
     while(true) {
