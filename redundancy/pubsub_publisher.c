@@ -68,7 +68,7 @@ addStateVariable(UA_Server *server, UA_Int64 *fakeValue) {
     attr.valueRank = -1;
     UA_Variant value;
 
-    UA_Variant_setScalar(&value, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
+    UA_Variant_setScalar(&value, fakeValue, &UA_TYPES[UA_TYPES_INT64]);
     attr.value = value;
 
     UA_NodeId stateNodeId = UA_NODEID_STRING(1, "SensorValue");
