@@ -1,4 +1,7 @@
+#include "../include/pubsub_heartbeat.h"
+
 #include <open62541/plugin/log_stdout.h>
+
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
 
@@ -12,8 +15,6 @@
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
-
-#include "../include/pubsub_heartbeat.h"
 
 UA_DateTime prevHbTime = 0;
 int epoll_fd = -1;
@@ -152,9 +153,9 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     int nfds =
         epoll_wait(epoll_fd, events, 1, HEARTBEATSLACK);  // 0 ms timeout for non-blocking
 
-    if(nfds <= 0) {
-        // UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
-    }
+    // if(nfds <= 0) {
+    //     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
+    // }
 
     if(events[0].events & EPOLLIN) {
         UA_DateTime newest = 0;
@@ -177,22 +178,29 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
         }
 
         if(newest != 0) {
-            if(*prevHbTime != 0) {
-                // UA_Int64 diff_ms = (newest - *prevHbTime) / UA_DATETIME_MSEC;
-                // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                //             "Heartbeat received after %lld ms", diff_ms);
-            } else {
-                UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                             "First heartbeat received");
-            }
-
             *prevHbTime = newest;  // update once per epoll wakeup
+            
+            // if(*prevHbTime != 0) {
+            //     // UA_Int64 diff_ms = (newest - *prevHbTime) / UA_DATETIME_MSEC;
+            //     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+            //     //             "Heartbeat received after %lld ms", diff_ms);
+            // } else {
+            //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+            //                  "First heartbeat received");
+            // }
         }
     }
 
     // Timeout detection
     UA_DateTime now = UA_DateTime_nowMonotonic();
     UA_DateTime time_ago = now - *prevHbTime;
+
+    // Handle edge case of starting as backup and no heartbeat recvd
+    if(*prevHbTime == 0) {
+        *prevHbTime = now;
+        return UA_STATUSCODE_GOOD;
+    }
+
     if(*prevHbTime != 0 && time_ago > HEARBEATIMEOUT) {
 
         UA_Int64 elapsed_ms = time_ago / UA_DATETIME_MSEC;
