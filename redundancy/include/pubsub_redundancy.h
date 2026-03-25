@@ -24,7 +24,7 @@ typedef struct {
     HeartbeatConfig *config;
     UA_NodeId writerGroupIdent;
     UA_NodeId dataSetWriterId;
-    size_t appStateVars;
+    UA_UInt32 appStateSize;
     UA_KeyValuePair *applicationStates;
 } syncThreadArgs_s;
 
@@ -33,15 +33,15 @@ static UA_Server *server;
 static UA_NodeId writerGroupIdent, dataSetWriterId;
 
 UA_StatusCode
-syncState(size_t appStateSize, UA_KeyValuePair *applicationStates);
+syncState(UA_UInt32 appStateSize, UA_KeyValuePair *applicationStates);
 
 static void *
 initSyncThreads(void *arg);
 
 UA_StatusCode
-initStateSync(UA_Boolean *isPrimary, UA_Server *server,
+initStateSync(UA_Boolean *isPrimary, UA_Server *_server,
             HeartbeatConfig *config, UA_NodeId writerGroupIdent,
-            UA_NodeId dataSetWriterId, size_t appStateVars,
+            UA_NodeId dataSetWriterId, UA_UInt32 appStateSize,
             UA_KeyValuePair *applicationStates);
 
 #endif

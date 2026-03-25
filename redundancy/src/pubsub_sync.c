@@ -243,10 +243,12 @@ addSubscribedVariables(UA_Server *server, UA_NodeId dataSetReaderId,
         vAttr.displayName.locale = UA_STRING("en-US");
         vAttr.displayName.text = readerConfig.dataSetMetaData.fields[i].name;
         vAttr.dataType = readerConfig.dataSetMetaData.fields[i].dataType;
+        
+        
 
         UA_NodeId newNode;
-        /* With only one field (index 0), map to the.int16 node */
         UA_NodeId targetNodeId = UA_NODEID_STRING(1, "state");
+        // UA_NodeId targetNodeId = *stateNodeId;
 
         UA_Server_addVariableNode(
             server, targetNodeId, folderId, UA_NS0ID(HASCOMPONENT),
@@ -275,7 +277,6 @@ fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
     pMetaData->fields = (UA_FieldMetaData *)UA_Array_new(
         pMetaData->fieldsSize, &UA_TYPES[UA_TYPES_FIELDMETADATA]);
 
-    /* Int16 DataType */
     UA_FieldMetaData_init(&pMetaData->fields[0]);
     UA_NodeId_copy(&RedundancyStateType.typeId, &pMetaData->fields[0].dataType);
     pMetaData->fields[0].builtInType = UA_NS0ID_STRUCTURE;
@@ -336,7 +337,7 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
                     stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
                     (unsigned long)stateStruct->applicationStatesSize);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "state is not an Int16 type");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Variant type mismatch");
     }
 
     UA_Variant_clear(&value);

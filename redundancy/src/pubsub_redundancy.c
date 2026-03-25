@@ -21,7 +21,7 @@ RedundancyState_s state;
 
 
 UA_StatusCode
-syncState(size_t appStateSize, UA_KeyValuePair *applicationStates) {
+syncState(UA_UInt32 appStateSize, UA_KeyValuePair *applicationStates) {
     if(*isPrimary != lastState) {
         if(*isPrimary) {
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
@@ -108,7 +108,7 @@ initSyncThreads(void *arg) {
 
     state.nmSequenceNr = 0;
     state.dswSequenceNr = 0;
-    state.applicationStatesSize = args.appStateVars;
+    state.applicationStatesSize = args.appStateSize;
     state.applicationStates = args.applicationStates;
 
     cbstruct_s stateStruct = {
@@ -134,7 +134,7 @@ initSyncThreads(void *arg) {
 UA_StatusCode
 initStateSync(UA_Boolean *isPrimary, UA_Server *_server, 
             HeartbeatConfig *config, UA_NodeId writerGroupIdent, 
-            UA_NodeId dataSetWriterId, size_t appStateVars, 
+            UA_NodeId dataSetWriterId, UA_UInt32 appStateSize, 
             UA_KeyValuePair *applicationStates) {
     syncThreadArgs_s args = {
         .isPrimary = isPrimary,
@@ -142,7 +142,7 @@ initStateSync(UA_Boolean *isPrimary, UA_Server *_server,
         .config = config,
         .writerGroupIdent = writerGroupIdent,
         .dataSetWriterId = dataSetWriterId,
-        .appStateVars = appStateVars,
+        .appStateSize = appStateSize,
         .applicationStates = applicationStates,
     };
     

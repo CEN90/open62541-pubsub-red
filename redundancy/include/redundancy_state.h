@@ -7,7 +7,7 @@ typedef struct {
     UA_Int16 nmSequenceNr;
     UA_Int16 dswSequenceNr;
 
-    size_t applicationStatesSize;
+    UA_UInt32 applicationStatesSize;
     UA_KeyValuePair *applicationStates;
 } RedundancyState_s;
 
