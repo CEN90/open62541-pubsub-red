@@ -17,8 +17,6 @@ static UA_DataSetReaderConfig readerConfig;
 static UA_Boolean lastIsPrimary = UA_FALSE;
 UA_DataType RedundancyStateType;
 
-
-
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
                     UA_NetworkAddressUrlDataType *networkAddressUrl) {
@@ -91,8 +89,7 @@ addStateDataField(UA_Server *server, RedundancyState_s *stateStruct,
     dataSetFieldConfig.dataSetFieldType = UA_PUBSUB_DATASETFIELD_VARIABLE;
     dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("state");
     dataSetFieldConfig.field.variable.promotedField = UA_FALSE;
-    dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
-        *stateNodeId;
+    dataSetFieldConfig.field.variable.publishParameters.publishedVariable = *stateNodeId;
     dataSetFieldConfig.field.variable.publishParameters.attributeId =
         UA_ATTRIBUTEID_VALUE;
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldConfig,
@@ -243,8 +240,6 @@ addSubscribedVariables(UA_Server *server, UA_NodeId dataSetReaderId,
         vAttr.displayName.locale = UA_STRING("en-US");
         vAttr.displayName.text = readerConfig.dataSetMetaData.fields[i].name;
         vAttr.dataType = readerConfig.dataSetMetaData.fields[i].dataType;
-        
-        
 
         UA_NodeId newNode;
         UA_NodeId targetNodeId = UA_NODEID_STRING(1, "state");
@@ -338,6 +333,10 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
                     (unsigned long)stateStruct->applicationStatesSize);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Variant type mismatch");
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                    "Variant type kind: %u, arrayLength: %lu",
+                    value.type ? value.type->typeKind : 999,
+                    (unsigned long)value.arrayLength);
     }
 
     UA_Variant_clear(&value);
@@ -352,11 +351,10 @@ setSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
     UA_StatusCode retval =
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "state"), value);
 
-    
     if(retval != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                      "Failed to write RedundancyState: 0x%08x", retval);
-    } 
+    }
     // else {
     //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
     //                 "RedundancyState written: nmSeq=%d dsmSeq=%d arraySize=%lu",

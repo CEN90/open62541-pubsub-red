@@ -168,7 +168,8 @@ updateFakeValue(UA_Server *server, void *data) {
 
         UA_Variant_setScalar(&value, cbData->val, &UA_TYPES[UA_TYPES_INT64]);
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %d", *(cbData->val));
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %d",
+                     *(cbData->val));
     }
 }
 
@@ -184,13 +185,10 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     UA_NetworkAddressUrlDataType networkAddressUrl = {
         UA_STRING_NULL, UA_STRING("opc.udp://224.0.0.22:4842/")};
 
-    UA_Variant fakeValueVariant;
-    UA_Variant_init(&fakeValueVariant);
-    UA_Variant_setScalar(&fakeValueVariant, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
-    UA_KeyValuePair *kp = UA_KeyValuePair_new();
+    UA_KeyValuePair *kps = UA_Array_new(N, &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
 
-    kp->value = fakeValueVariant;
-    kp->key = UA_QUALIFIEDNAME(1, "FakeNews");
+    kps[0].key = UA_QUALIFIEDNAME(1, "FakeNews");
+    UA_Variant_setScalar(&kps[0].value, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
 
     // common
     addPubSubConnection(server, &transportProfile, &networkAddressUrl);
@@ -208,11 +206,12 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
 
     UA_Server_enableAllPubSubComponents(server);
 
-    initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, 1, kp);
+    initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, N,
+                  kps);
 
     // Busy wait, refactor to cb?
     while(true) {
-        syncState(1, kp); // use retval later
+        syncState(N, kps);  // use retval later
 
         UA_Server_run_iterate(server, true);
     }

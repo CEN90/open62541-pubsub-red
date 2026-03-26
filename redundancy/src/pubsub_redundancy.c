@@ -109,7 +109,10 @@ initSyncThreads(void *arg) {
     state.nmSequenceNr = 0;
     state.dswSequenceNr = 0;
     state.applicationStatesSize = args.appStateSize;
-    state.applicationStates = args.applicationStates;
+    
+    state.applicationStates = UA_Array_new(args.appStateSize, &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+    UA_StatusCode retv = UA_Array_copy(args.applicationStates, args.appStateSize, (void *)&(state.applicationStates), &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+    // state.applicationStates = args.applicationStates;
 
     cbstruct_s stateStruct = {
         .data = &state,
