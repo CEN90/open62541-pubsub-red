@@ -12,6 +12,12 @@
 #define PUBLISHINGINTERVAL 1000
 #define KEYFRAMECOUNT 10
 
+#define POLLINGINTERVAL 10
+#define DEADLINE 100
+
+UA_Variant prevValue;
+UA_DateTime prevTimestamp = 0;
+
 
 static UA_NodeId connectionIdentifier,
                  readerGroupIdentifier,
@@ -179,6 +185,38 @@ readFakeSensorValue(UA_Server *server, void *data) {
     }
 }
 
+static void
+onPollingEventSimple(UA_Server *server, void *data) {
+    UA_Variant value;
+    UA_Variant_init(&value);
+
+    UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "SensorValue"), &value);
+
+    if(retval == UA_STATUSCODE_GOOD) {
+        // If no previous value, initialize
+        if(prevTimestamp == 0 || prevValue.type == NULL) {
+            prevTimestamp = UA_DateTime_nowMonotonic();
+            prevValue = value;
+            return;
+        }
+        
+        // Old value, update timestamp only
+        if(*(UA_Int64*) value.data == *(UA_Int64*) prevValue.data) {
+            prevTimestamp = UA_DateTime_nowMonotonic();
+            return;
+        }
+        
+        // New value, update timestamp and value
+        prevValue = value;
+        UA_DateTimeStruct delta = UA_DateTime_toStruct(UA_DateTime_nowMonotonic() - prevTimestamp);
+        
+        if(delta.milliSec >= DEADLINE) 
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Time exceeded: %lld", delta.milliSec);
+        else 
+            prevTimestamp = UA_DateTime_nowMonotonic();
+    }
+}
+
 
 int
 main(int argc, char *argv[]) {
@@ -201,9 +239,9 @@ main(int argc, char *argv[]) {
 
     // CB for publishing/reading state
     UA_Server_addRepeatedCallback(server,
-                                readFakeSensorValue,
+                                onPollingEventSimple,
                                 NULL,
-                                PUBLISHINGINTERVAL,
+                                POLLINGINTERVAL,
                                 NULL);
 
     UA_Server_enableAllPubSubComponents(server);
