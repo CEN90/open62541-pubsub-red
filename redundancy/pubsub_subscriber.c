@@ -14,9 +14,12 @@
 
 #define POLLINGINTERVAL 10
 #define DEADLINE 100
+#define DEADLINECHANGE (UA_DATETIME_MSEC * DEADLINE)
+#define DEADLINENOCHANGE UA_DATETIME_SEC
+
 
 UA_Variant prevValue;
-UA_DateTime prevTimestamp = 0;
+UA_DateTime prevTimeValChange;
 
 
 static UA_NodeId connectionIdentifier,
@@ -186,6 +189,16 @@ readFakeSensorValue(UA_Server *server, void *data) {
 }
 
 static void
+onPollLogValue(UA_Server *server, void *data) {
+    UA_LOG_INFO(
+        UA_Log_Stdout,
+        UA_LOGCATEGORY_SERVER, 
+        "Value read: %lld", 
+        *(UA_Int64*)prevValue.data
+    );
+}
+
+static void
 onPollingEventSimple(UA_Server *server, void *data) {
     UA_Variant value;
     UA_Variant_init(&value);
@@ -193,27 +206,33 @@ onPollingEventSimple(UA_Server *server, void *data) {
     UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "SensorValue"), &value);
 
     if(retval == UA_STATUSCODE_GOOD) {
-        // If no previous value, initialize
-        if(prevTimestamp == 0 || prevValue.type == NULL) {
-            prevTimestamp = UA_DateTime_nowMonotonic();
+        UA_DateTime now = UA_DateTime_nowMonotonic();
+        
+        // No previous value, initialize only
+        if(prevTimeValChange == 0 || prevValue.type == NULL) {
+            prevTimeValChange = now;
             prevValue = value;
             return;
         }
         
-        // Old value, update timestamp only
+        UA_DateTime delta = now - prevTimeValChange;
+        
+        // Old value, check if time exceeded
         if(*(UA_Int64*) value.data == *(UA_Int64*) prevValue.data) {
-            prevTimestamp = UA_DateTime_nowMonotonic();
-            return;
-        }
-        
-        // New value, update timestamp and value
-        prevValue = value;
-        UA_DateTimeStruct delta = UA_DateTime_toStruct(UA_DateTime_nowMonotonic() - prevTimestamp);
-        
-        if(delta.milliSec >= DEADLINE) 
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Time exceeded: %lld", delta.milliSec);
-        else 
-            prevTimestamp = UA_DateTime_nowMonotonic();
+            if(delta >= DEADLINENOCHANGE) {
+                prevTimeValChange = now;
+                UA_LOG_ERROR(
+                    UA_Log_Stdout, 
+                    UA_LOGCATEGORY_SERVER, 
+                    "Time with no new value exceeded: %lld ms", 
+                    delta / UA_DATETIME_MSEC
+                );
+            }
+        } else {
+            // New value, update timestamp and value
+            prevValue = value;
+            prevTimeValChange = now;
+        }        
     }
 }
 
@@ -225,6 +244,9 @@ main(int argc, char *argv[]) {
     UA_ServerConfig *config = UA_Server_getConfig(server);
     UA_ServerConfig_setDefault(config);
 
+    UA_Variant_init(&prevValue);
+    UA_DateTime_init(&prevTimeValChange);
+    
     // common
     UA_String transportProfile =
         UA_STRING("http://opcfoundation.org/UA-Profile/Transport/pubsub-udp-uadp");
@@ -242,6 +264,11 @@ main(int argc, char *argv[]) {
                                 onPollingEventSimple,
                                 NULL,
                                 POLLINGINTERVAL,
+                                NULL);
+    UA_Server_addRepeatedCallback(server,
+                                onPollLogValue,
+                                NULL,
+                                PUBLISHINGINTERVAL,
                                 NULL);
 
     UA_Server_enableAllPubSubComponents(server);
