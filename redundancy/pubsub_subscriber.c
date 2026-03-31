@@ -12,10 +12,8 @@
 #define PUBLISHINGINTERVAL 1000
 #define KEYFRAMECOUNT 10
 
-#define POLLINGINTERVAL 10
-#define DEADLINE 100
-#define DEADLINECHANGE (UA_DATETIME_MSEC * DEADLINE)
-#define DEADLINENOCHANGE UA_DATETIME_SEC
+#define POLLINGINTERVAL 1
+#define DEADLINE UA_DATETIME_SEC
 
 
 UA_Variant prevValue;
@@ -190,11 +188,14 @@ readFakeSensorValue(UA_Server *server, void *data) {
 
 static void
 onPollLogValue(UA_Server *server, void *data) {
+    UA_DateTimeStruct test = UA_DateTime_toStruct(prevTimeValChange);
+    
     UA_LOG_INFO(
         UA_Log_Stdout,
         UA_LOGCATEGORY_SERVER, 
-        "Value read: %lld", 
-        *(UA_Int64*)prevValue.data
+        "Value: %lld -> %lld sec, %lld ms, %lld us", 
+        *(UA_Int64*)prevValue.data,
+        test.sec, test.milliSec, test.microSec
     );
 }
 
@@ -219,13 +220,14 @@ onPollingEventSimple(UA_Server *server, void *data) {
         
         // Old value, check if time exceeded
         if(*(UA_Int64*) value.data == *(UA_Int64*) prevValue.data) {
-            if(delta >= DEADLINENOCHANGE) {
+            if(delta > DEADLINE) {
                 prevTimeValChange = now;
+                UA_DateTimeStruct test = UA_DateTime_toStruct(delta);
                 UA_LOG_ERROR(
                     UA_Log_Stdout, 
                     UA_LOGCATEGORY_SERVER, 
-                    "Time with no new value exceeded: %lld ms", 
-                    delta / UA_DATETIME_MSEC
+                    "Deadline not held -> %lld sec, %lld ms, %lld us", 
+                    test.sec, test.milliSec, test.microSec
                 );
             }
         } else {
