@@ -54,26 +54,69 @@ addPublishedDataSet(UA_Server *server) {
 
 static UA_NodeId
 addStateVariable(UA_Server *server, RedundancyState_s *stateStruct) {
+    const UA_DataType *redundancyType = getRedundancyType(server);
+    if(!redundancyType) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "RedundancyState type not found in server");
+        return UA_NODEID_NULL;
+    }
+
+    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                 "Type found: %s memSize=%u membersSize=%u",
+                 redundancyType->typeName,
+                 redundancyType->memSize,
+                 redundancyType->membersSize);
+
+
+    if(redundancyType->memSize == 0 || redundancyType->membersSize == 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "Type descriptor is corrupt (memSize=%u, members=%u)",
+                     redundancyType->memSize, redundancyType->membersSize);
+        return UA_NODEID_NULL;
+    }
+
     UA_VariableAttributes attr = UA_VariableAttributes_default;
     attr.displayName = UA_LOCALIZEDTEXT("en-US", "state");
-    attr.dataType = RedundancyStateType.typeId;
-    attr.valueRank = -1;
+    attr.dataType    = redundancyType->typeId;
+    attr.valueRank   = UA_VALUERANK_SCALAR;
+
     UA_Variant value;
     UA_Variant_init(&value);
-
-    UA_Variant_setScalar(&value, stateStruct, &RedundancyStateType);
+    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                 "sizeof(RedundancyState_s)=%zu redundancyType->memSize=%u",
+                 sizeof(RedundancyState_s), redundancyType->memSize);
+    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                 "stateStruct=%p nmSeq=%d dswSeq=%d arraySize=%zu arrayPtr=%p",
+                 (void*)stateStruct,
+                 stateStruct->nmSequenceNr,
+                 stateStruct->dswSequenceNr,
+                 stateStruct->applicationStatesSize,
+                 (void*)stateStruct->applicationStates);
+    UA_StatusCode rc = UA_Variant_setScalarCopy(&value, stateStruct, redundancyType);
+    if(rc != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "Variant copy failed: 0x%08x", rc);
+        return UA_NODEID_NULL;
+    }
     attr.value = value;
 
     UA_NodeId stateNodeId = UA_NODEID_STRING(1, "state");
-    UA_Server_addVariableNode(
-        server, stateNodeId, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
-        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES), UA_QUALIFIEDNAME(1, "state"),
-        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), attr, NULL, NULL);
+    UA_StatusCode addRc = UA_Server_addVariableNode(
+        server, stateNodeId,
+        UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
+        UA_QUALIFIEDNAME(1, "state"),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
+        attr, NULL, NULL);
 
-    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                 "nmSequenceNr: %d, dswSequenceNr: %d, arraySize: %lu",
-                 stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
-                 (unsigned long)stateStruct->applicationStatesSize);
+    UA_Variant_clear(&value);
+
+    if(addRc != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "addVariableNode failed: 0x%08x", addRc);
+        return UA_NODEID_NULL;
+    }
+
     return stateNodeId;
 }
 
@@ -193,7 +236,7 @@ addDataSetReader(UA_Server *server) {
                                 &UA_TYPES[UA_TYPES_UADPDATASETREADERMESSAGEDATATYPE]);
 
     /* Setting up Meta data configuration in DataSetReader */
-    fillTestDataSetMetaData(&readerConfig.dataSetMetaData);
+    fillTestDataSetMetaData(&readerConfig.dataSetMetaData,server);
 
     UA_Server_addDataSetReader(server, readerGroupIdentifier, &readerConfig,
                                &readerIdentifier);
@@ -262,9 +305,15 @@ addSubscribedVariables(UA_Server *server, UA_NodeId dataSetReaderId,
 }
 
 static void
-fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
+fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData, UA_Server *server) {
     UA_DataSetMetaDataType_init(pMetaData);
     pMetaData->name = UA_STRING("RedundancyStateDataSet");
+
+    const UA_DataType *redundancyType = getRedundancyType(server);
+    if(!redundancyType) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "RedundancyState type not found in server");
+    }
 
     /* Now there is only 1 field (Int16) */
     pMetaData->fieldsSize = 1;
@@ -272,7 +321,7 @@ fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
         pMetaData->fieldsSize, &UA_TYPES[UA_TYPES_FIELDMETADATA]);
 
     UA_FieldMetaData_init(&pMetaData->fields[0]);
-    UA_NodeId_copy(&RedundancyStateType.typeId, &pMetaData->fields[0].dataType);
+    UA_NodeId_copy(&redundancyType->typeId, &pMetaData->fields[0].dataType);
     pMetaData->fields[0].builtInType = UA_NS0ID_STRUCTURE;
     pMetaData->fields[0].name = UA_STRING("state");
     pMetaData->fields[0].valueRank = -1; /* scalar */
@@ -304,7 +353,13 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
         return;
     }
 
-    if(UA_Variant_hasScalarType(&value, &RedundancyStateType)) {
+    const UA_DataType *redundancyType = getRedundancyType(server);
+    if(!redundancyType) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "RedundancyState type not found in server");
+    }
+
+    if(UA_Variant_hasScalarType(&value, redundancyType)) {
         RedundancyState_s *remoteState = (RedundancyState_s *)value.data;
 
         stateStruct->nmSequenceNr = remoteState->nmSequenceNr;
@@ -346,7 +401,13 @@ setSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_Variant_setScalarCopy(&value, stateStruct, &RedundancyStateType);
+    const UA_DataType *redundancyType = getRedundancyType(server);
+    if(!redundancyType) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "RedundancyState type not found in server");
+    }
+
+    UA_Variant_setScalarCopy(&value, stateStruct, redundancyType);
     UA_StatusCode retval =
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "state"), value);
 

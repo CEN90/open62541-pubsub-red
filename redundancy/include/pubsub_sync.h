@@ -49,7 +49,7 @@ addSubscribedVariables(UA_Server *server, UA_NodeId dataSetReaderId,
                        UA_NodeId *stateNodeId);
 
 static void
-fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData);
+fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData, UA_Server *server);
 
 // Test functions
 static void
