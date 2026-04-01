@@ -15,7 +15,6 @@ static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
 
 static UA_DataSetReaderConfig readerConfig;
 static UA_Boolean lastIsPrimary = UA_FALSE;
-UA_DataType RedundancyStateType;
 
 static void
 addPubSubConnection(UA_Server *server, UA_String *transportProfile,
@@ -431,8 +430,7 @@ runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddr
 
     UA_ServerConfig_setDefault(config);
 
-    getRedundancyState(&RedundancyStateType, UA_NODEID_STRING(1, "RedundancyState"));
-
+    RedundancyStateType.typeId = UA_NODEID_NUMERIC(1, 1001);
     UA_Server_addDataType(server, UA_NODEID_NUMERIC(0, UA_NS0ID_STRUCTURE),
                           &RedundancyStateType);
 

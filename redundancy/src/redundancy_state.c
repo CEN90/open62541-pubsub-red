@@ -4,7 +4,7 @@
 
 
 
-static UA_DataTypeMember members[4] = {
+static UA_DataTypeMember members[3] = {
     {
         .memberName = "nmSequenceNr",
         .memberType = &UA_TYPES[UA_TYPES_INT16],
@@ -12,14 +12,8 @@ static UA_DataTypeMember members[4] = {
         .isArray = false
     },
     {
-        .memberName = "dsmSequenceNr",
+        .memberName = "dswSequenceNr",
         .memberType = &UA_TYPES[UA_TYPES_INT16],
-        .padding = 0,
-        .isArray = false
-    },
-    {
-        .memberName = "applicationStatesSize",
-        .memberType = &UA_TYPES[UA_TYPES_UINT32],
         .padding = 0,
         .isArray = false
     },
@@ -31,29 +25,12 @@ static UA_DataTypeMember members[4] = {
     }
 };
 
-// UA_DataType RedundancyStateType = {
-//     .memSize = sizeof(RedundancyState_s),
-//     .typeKind = UA_DATATYPEKIND_STRUCTURE,
-//     .pointerFree = false,
-//     .overlayable = false,
-//     .membersSize = 3,
-//     .members = members,
-//     .typeName = "RedundancyState"
-// };
-
-
-void
-getRedundancyState(UA_DataType *type, UA_NodeId typeNodeId) {
-    UA_DataType RedundancyStateType = {
-        .typeId = typeNodeId,
-        .memSize = sizeof(RedundancyState_s),
-        .typeKind = UA_DATATYPEKIND_STRUCTURE,
-        .pointerFree = false,
-        .overlayable = false,
-        .membersSize = 4,
-        .members = members,
-        .typeName = "RedundancyState"
-    };
-    
-    *type = RedundancyStateType;
-}
+UA_DataType RedundancyStateType = {
+    .memSize = sizeof(RedundancyState_s),
+    .typeKind = UA_DATATYPEKIND_STRUCTURE,
+    .pointerFree = false,
+    .overlayable = false,
+    .membersSize = 3,
+    .members = members,
+    .typeName = "RedundancyState"
+};
