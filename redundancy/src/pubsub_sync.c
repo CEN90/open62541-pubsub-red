@@ -71,7 +71,7 @@ addStateVariable(UA_Server *server, RedundancyState_s *stateStruct) {
         UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), attr, NULL, NULL);
 
     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                 "nmSequenceNr: %d, dsmSequenceNr: %d, arraySize: %lu",
+                 "nmSequenceNr: %d, dswSequenceNr: %d, arraySize: %lu",
                  stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
                  (unsigned long)stateStruct->applicationStatesSize);
     return stateNodeId;
@@ -430,9 +430,9 @@ runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddr
 
     UA_ServerConfig_setDefault(config);
 
-    RedundancyStateType.typeId = UA_NODEID_NUMERIC(1, 1001);
-    UA_Server_addDataType(server, UA_NODEID_NUMERIC(0, UA_NS0ID_STRUCTURE),
-                          &RedundancyStateType);
+    registerRedundancyStateType(server);
+
+
 
     // common
     addPubSubConnection(server, transportProfile, networkAddressUrl);

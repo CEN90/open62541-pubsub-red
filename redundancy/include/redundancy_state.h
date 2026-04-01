@@ -11,6 +11,6 @@ typedef struct {
     UA_KeyValuePair *applicationStates;
 } RedundancyState_s;
 
-extern UA_DataType RedundancyStateType;
+void registerRedundancyStateType(UA_Server *server);
 
 #endif
