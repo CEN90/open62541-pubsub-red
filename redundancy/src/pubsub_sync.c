@@ -493,6 +493,19 @@ runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddr
 
     registerRedundancyStateType(server);
 
+    const UA_DataType *t = getRedundancyType(server);
+    if(t) {
+        UA_DataTypeArray *customTypes = (UA_DataTypeArray*)UA_malloc(sizeof(UA_DataTypeArray));
+        customTypes->next  = config->customDataTypes;
+        customTypes->types = t;
+        customTypes->typesSize = 1;
+        config->customDataTypes = customTypes;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                    "Custom type pushed to PubSub config: %s", t->typeName);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "Type not found, PubSub will not decode correctly");
+    }
 
 
     // common
