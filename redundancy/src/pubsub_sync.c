@@ -358,39 +358,59 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                      "RedundancyState type not found in server");
     }
+    if(redundancyType) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                    "Subscriber type registered: %s ns=%u id=%u memSize=%u",
+                    redundancyType->typeName,
+                    redundancyType->typeId.namespaceIndex,
+                    redundancyType->typeId.identifier.numeric,
+                    redundancyType->memSize);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                     "Subscriber type NOT registered");
+    }
 
-    if(UA_Variant_hasScalarType(&value, redundancyType)) {
+    if(value.type != NULL &&
+       value.arrayLength == 0 &&
+       UA_NodeId_equal(&value.type->typeId, &redundancyType->typeId)) {
+
         RedundancyState_s *remoteState = (RedundancyState_s *)value.data;
-
-        stateStruct->nmSequenceNr = remoteState->nmSequenceNr;
+        stateStruct->nmSequenceNr  = remoteState->nmSequenceNr;
         stateStruct->dswSequenceNr = remoteState->dswSequenceNr;
 
-        stateStruct->applicationStatesSize = remoteState->applicationStatesSize;
-
-        // if(stateStruct->applicationStates)
-        //     UA_Array_delete(stateStruct->applicationStates,
-        //                     stateStruct->applicationStatesSize,
-        //                     &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+        /* Free old array if present */
+        if(stateStruct->applicationStates && stateStruct->applicationStatesSize > 0) {
+            UA_Array_delete(stateStruct->applicationStates,
+                            stateStruct->applicationStatesSize,
+                            &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+            stateStruct->applicationStates = NULL;
+            stateStruct->applicationStatesSize = 0;
+        }
 
         if(remoteState->applicationStatesSize > 0) {
-            stateStruct->applicationStates = UA_Array_new(
-                remoteState->applicationStatesSize, &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
-            for(size_t i = 0; i < remoteState->applicationStatesSize; i++)
-                stateStruct->applicationStates[i] = remoteState->applicationStates[i];
-        } else {
-            stateStruct->applicationStates = NULL;
+            /* Deep copy the UA_String array */
+            UA_StatusCode rc = UA_Array_copy(
+                remoteState->applicationStates,
+                remoteState->applicationStatesSize,
+                (void**)&stateStruct->applicationStates,
+                &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+            if(rc == UA_STATUSCODE_GOOD)
+                stateStruct->applicationStatesSize = remoteState->applicationStatesSize;
+            else
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                             "Failed to copy applicationStates: 0x%08x", rc);
         }
 
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                    "Sync state read: nmSeq=%d dsmSeq=%d arraySize=%lu",
+                    "Sync state read: nmSeq=%d dswSeq=%d arraySize=%lu",
                     stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
                     (unsigned long)stateStruct->applicationStatesSize);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Variant type mismatch");
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-                    "Variant type kind: %u, arrayLength: %lu",
-                    value.type ? value.type->typeKind : 999,
-                    (unsigned long)value.arrayLength);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                     "Variant type mismatch — typeId ns=%u id=%u kind=%u",
+                     value.type ? value.type->typeId.namespaceIndex : 0,
+                     value.type ? value.type->typeId.identifier.numeric : 0,
+                     value.type ? value.type->typeKind : 999);
     }
 
     UA_Variant_clear(&value);
