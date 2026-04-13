@@ -540,7 +540,7 @@ runPubSub(UA_String *transportProfile, UA_NetworkAddressUrlDataType *networkAddr
     if(t) {
         UA_DataTypeArray *customTypes = (UA_DataTypeArray*)UA_malloc(sizeof(UA_DataTypeArray));
         customTypes->next  = config->customDataTypes;
-        customTypes->types = t;
+        customTypes->types = (UA_DataType*)t;
         customTypes->typesSize = 1;
         config->customDataTypes = customTypes;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
