@@ -409,7 +409,7 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
                     stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
                     (unsigned long)stateStruct->applicationStatesSize);
         
-        UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(appServer, appWriterGroupId, stateStruct->dswSequenceNr);
+        UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(appServer, appWriterGroupId, stateStruct->dswSequenceNr + 1);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "syncState: Failed to set WriterGroup seq nr, "
@@ -417,7 +417,7 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
                            retval);
         }
         
-        retval = UA_Server_setDataSetWriterSequenceNumber(appServer, appDataSetReaderGroupId, stateStruct->nmSequenceNr);
+        retval = UA_Server_setDataSetWriterSequenceNumber(appServer, appDataSetReaderGroupId, stateStruct->nmSequenceNr + 1);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "syncState: Failed to set dataSetWriter seq nr, "

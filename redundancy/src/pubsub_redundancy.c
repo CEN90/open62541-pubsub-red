@@ -47,12 +47,12 @@ onFirstSyncState() {
                            retval);
         }
 
-        UA_Server_setWriterGroupOperational(server, writerGroupIdent);
+        // UA_Server_setWriterGroupOperational(server, writerGroupIdent);
     } else {
         UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                        "onFirstSyncState: BACKUP -> Not publishing");
 
-        UA_Server_setWriterGroupDisabled(server, writerGroupIdent);
+        // UA_Server_setWriterGroupDisabled(server, writerGroupIdent);
     }
 
     lastState = *isPrimary;
