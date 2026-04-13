@@ -226,7 +226,7 @@ onPollingEventSimple(UA_Server *server, void *data) {
                 UA_LOG_ERROR(
                     UA_Log_Stdout, 
                     UA_LOGCATEGORY_SERVER, 
-                    "Deadline not held -> %lld sec, %lld ms, %lld us", 
+                    "Deadline not held -> %lld ms, %lld us", 
                     test.sec, test.milliSec, test.microSec
                 );
             }
