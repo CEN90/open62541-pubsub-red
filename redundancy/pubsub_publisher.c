@@ -209,11 +209,12 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, N,
                   kps);
 
-    // Busy wait, refactor to cb?
     while(true) {
         syncState(N, kps);  // use retval later
-
-        UA_Server_run_iterate(server, true);
+        
+        if(*isPrimary) {
+            UA_Server_run_iterate(server, true);
+        }
     }
 
     UA_Server_delete(server);
