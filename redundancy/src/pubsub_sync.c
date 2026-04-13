@@ -12,6 +12,8 @@
 
 static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
     dataSetWriterIdent, readerGroupIdentifier, readerIdentifier;
+    
+static UA_NodeId appWriterGroupId, appDataSetReaderGroupId;
 
 static UA_DataSetReaderConfig readerConfig;
 static UA_Boolean lastIsPrimary = UA_FALSE;
@@ -405,6 +407,23 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
                     "Sync state read: nmSeq=%d dswSeq=%d arraySize=%lu",
                     stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
                     (unsigned long)stateStruct->applicationStatesSize);
+        
+        UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(server, appWriterGroupId, stateStruct->dswSequenceNr);
+        if(retval != UA_STATUSCODE_GOOD) {
+            UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                           "syncState: Failed to set WriterGroup seq nr, "
+                           "StatusCode: 0x%08x",
+                           retval);
+        }
+        
+        retval = UA_Server_setDataSetWriterSequenceNumber(server, appDataSetReaderGroupId, stateStruct->nmSequenceNr);
+        if(retval != UA_STATUSCODE_GOOD) {
+            UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                           "syncState: Failed to set dataSetWriter seq nr, "
+                           "StatusCode: 0x%08x",
+                           retval);
+        }
+        
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
                      "Variant type mismatch — typeId ns=%u id=%u kind=%u",
@@ -495,6 +514,8 @@ void *
 initSync(void *data) {
     cbstruct_s *stateStruct = (cbstruct_s *)data;
     UA_Boolean *isPrimary = stateStruct->isPrimary;
+    appDataSetReaderGroupId = stateStruct->DatasetReaderGroupId;
+    appWriterGroupId = stateStruct->writerGroupId;
     RedundancyState_s *state = stateStruct->data;
     setupPubSub(isPrimary, state, NULL);
 

@@ -21,42 +21,49 @@ RedundancyState_s state;
 
 
 UA_StatusCode
-syncState(UA_UInt32 appStateSize, UA_KeyValuePair *applicationStates) {
-    if(*isPrimary != lastState) {
-        if(*isPrimary) {
+onFirstSyncState() {
+    if(*isPrimary) {
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                     "onFirstSyncState: PRIMARY -> start publishing %d \n", *isPrimary);
+
+        UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(
+            server, writerGroupIdent, state.nmSequenceNr);
+        if(retval == UA_STATUSCODE_GOOD) {
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                         "syncState: PRIMARY -> start publishing %d \n", *isPrimary);
-
-            UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(
-                server, writerGroupIdent, state.nmSequenceNr);
-            if(retval == UA_STATUSCODE_GOOD) {
-                UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                             "syncState: WriterGroup sequence number set to %u",
-                             state.nmSequenceNr);
-            } else {
-                UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                               "syncState: Failed to set WriterGroup sequence number, "
-                               "StatusCode: 0x%08x",
-                               retval);
-            }
-            retval = UA_Server_setDataSetWriterSequenceNumber(server, dataSetWriterId,
-                                                          state.dswSequenceNr);
-            if(retval != UA_STATUSCODE_GOOD) {
-                UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                               "syncState: Failed to set DataSetWriter sequence number, "
-                               "StatusCode: 0x%08x",
-                               retval);
-            }
-
-            UA_Server_setWriterGroupOperational(server, writerGroupIdent);
+                         "onFirstSyncState: WriterGroup sequence number set to %u",
+                         state.nmSequenceNr);
         } else {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                           "syncState: BACKUP -> Not publishing");
-
-            UA_Server_setWriterGroupDisabled(server, writerGroupIdent);
+                           "onFirstSyncState: Failed to set WriterGroup sequence number, "
+                           "StatusCode: 0x%08x",
+                           retval);
+        }
+        retval = UA_Server_setDataSetWriterSequenceNumber(server, dataSetWriterId,
+                                                      state.dswSequenceNr);
+        if(retval != UA_STATUSCODE_GOOD) {
+            UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                           "onFirstSyncState: Failed to set DataSetWriter sequence number, "
+                           "StatusCode: 0x%08x",
+                           retval);
         }
 
-        lastState = *isPrimary;
+        UA_Server_setWriterGroupOperational(server, writerGroupIdent);
+    } else {
+        UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                       "onFirstSyncState: BACKUP -> Not publishing");
+
+        UA_Server_setWriterGroupDisabled(server, writerGroupIdent);
+    }
+
+    lastState = *isPrimary;
+    
+    return UA_STATUSCODE_GOOD;
+}
+
+UA_StatusCode
+syncState(UA_UInt32 appStateSize, UA_KeyValuePair *applicationStates) {
+    if(*isPrimary != lastState) {
+        onFirstSyncState();
     }
 
     if(*isPrimary) {
@@ -84,7 +91,7 @@ syncState(UA_UInt32 appStateSize, UA_KeyValuePair *applicationStates) {
                         "syncState: dataSetWriterSequenceNr: %u", nmSeq);
         } else {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                           "syncState: Failed to get DataSetWriter sequence number, "
+                           "syncState: Failed to get DataSetWriter seq nr, "
                            "StatusCode: 0x%08x",
                            retval);
         }
@@ -117,6 +124,8 @@ initSyncThreads(void *arg) {
     cbstruct_s stateStruct = {
         .data = &state,
         .isPrimary = args.isPrimary,
+        .writerGroupId = args.writerGroupIdent,
+        .DatasetReaderGroupId = args.dataSetWriterId
     };
 
     if(args.config->sockfd == NULL) {

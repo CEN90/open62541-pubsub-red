@@ -4,6 +4,7 @@
 #include <open62541/server.h>
 #include <open62541/server_config_default.h>
 #include <open62541/server_pubsub.h>
+#include <open62541/types.h>
 
 #include "../include/redundancy_state.h"
 #include "pubsub_redundancy.h"
@@ -20,6 +21,8 @@
 typedef struct {
     RedundancyState_s *data;
     UA_Boolean *isPrimary;
+    UA_NodeId writerGroupId;
+    UA_NodeId DatasetReaderGroupId;
 } cbstruct_s;
 
 static void
