@@ -21,6 +21,7 @@
 typedef struct {
     RedundancyState_s *data;
     UA_Boolean *isPrimary;
+    UA_Server *server;
     UA_NodeId writerGroupId;
     UA_NodeId DatasetReaderGroupId;
 } cbstruct_s;

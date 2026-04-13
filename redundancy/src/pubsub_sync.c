@@ -14,6 +14,7 @@ static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
     dataSetWriterIdent, readerGroupIdentifier, readerIdentifier;
     
 static UA_NodeId appWriterGroupId, appDataSetReaderGroupId;
+static UA_Server *appServer;
 
 static UA_DataSetReaderConfig readerConfig;
 static UA_Boolean lastIsPrimary = UA_FALSE;
@@ -408,7 +409,7 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
                     stateStruct->nmSequenceNr, stateStruct->dswSequenceNr,
                     (unsigned long)stateStruct->applicationStatesSize);
         
-        UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(server, appWriterGroupId, stateStruct->dswSequenceNr);
+        UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(appServer, appWriterGroupId, stateStruct->dswSequenceNr);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "syncState: Failed to set WriterGroup seq nr, "
@@ -416,7 +417,7 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
                            retval);
         }
         
-        retval = UA_Server_setDataSetWriterSequenceNumber(server, appDataSetReaderGroupId, stateStruct->nmSequenceNr);
+        retval = UA_Server_setDataSetWriterSequenceNumber(appServer, appDataSetReaderGroupId, stateStruct->nmSequenceNr);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "syncState: Failed to set dataSetWriter seq nr, "
@@ -516,6 +517,7 @@ initSync(void *data) {
     UA_Boolean *isPrimary = stateStruct->isPrimary;
     appDataSetReaderGroupId = stateStruct->DatasetReaderGroupId;
     appWriterGroupId = stateStruct->writerGroupId;
+    appServer = stateStruct->server;
     RedundancyState_s *state = stateStruct->data;
     setupPubSub(isPrimary, state, NULL);
 

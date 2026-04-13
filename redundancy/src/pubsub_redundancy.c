@@ -124,6 +124,7 @@ initSyncThreads(void *arg) {
     cbstruct_s stateStruct = {
         .data = &state,
         .isPrimary = args.isPrimary,
+        .server = server,
         .writerGroupId = args.writerGroupIdent,
         .DatasetReaderGroupId = args.dataSetWriterId
     };
