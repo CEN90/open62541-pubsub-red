@@ -23,9 +23,6 @@ RedundancyState_s state;
 UA_StatusCode
 onFirstSyncState() {
     if(*isPrimary) {
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                     "onFirstSyncState: PRIMARY -> start publishing %d \n", *isPrimary);
-
         UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(
             server, writerGroupIdent, state.nmSequenceNr);
         if(retval == UA_STATUSCODE_GOOD) {
@@ -46,13 +43,13 @@ onFirstSyncState() {
                            "StatusCode: 0x%08x",
                            retval);
         }
+        
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                     "P(1.2): onFirstSyncState: PRIMARY -> start publishing %d \n", *isPrimary);
 
-        // UA_Server_setWriterGroupOperational(server, writerGroupIdent);
     } else {
         UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                        "onFirstSyncState: BACKUP -> Not publishing");
-
-        // UA_Server_setWriterGroupDisabled(server, writerGroupIdent);
     }
 
     lastState = *isPrimary;

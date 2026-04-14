@@ -13,6 +13,9 @@
 #define N 1
 #define FAKEVALUE 62541
 
+UA_Int16 runtime = 0;
+
+
 void
 runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary);
 
@@ -168,9 +171,20 @@ updateFakeValue(UA_Server *server, void *data) {
 
         UA_Variant_setScalar(&value, cbData->val, &UA_TYPES[UA_TYPES_INT64]);
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %d",
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "P(1.3): SensorValue: %d",
                      *(cbData->val));
     }
+}
+
+UA_DateTime
+makeDeadline(UA_Int16 timeoutSeconds) {
+    return UA_DateTime_nowMonotonic()
+         + (UA_DateTime)(timeoutSeconds * UA_DATETIME_SEC);
+}
+
+UA_Boolean
+deadlinePassed(UA_DateTime deadline) {
+    return UA_DateTime_nowMonotonic() > deadline;
 }
 
 void
@@ -209,11 +223,17 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, N,
                   kps);
 
+    UA_DateTime deadline = makeDeadline(runtime);
+        
     while(true) {
         syncState(N, kps);  // use retval later
         
         if(*isPrimary) {
             UA_Server_run_iterate(server, true);
+        }
+        
+        if(runtime > 0 && deadlinePassed(deadline)) {
+            break;
         }
     }
 
@@ -226,7 +246,7 @@ main(int argc, char *argv[]) {
     UA_Boolean isPrimary = UA_FALSE;
     char redDcnIp[IPADDRLEN] = "127.0.0.1";
 
-    if(argc == 3) {
+    if(argc >= 3) {
         strcpy(redDcnIp, argv[2]);
 
         if(strcmp(argv[1], "--primary") == 0)
@@ -238,6 +258,13 @@ main(int argc, char *argv[]) {
                          argv[1]);
             return -1;
         }
+        
+        if (argc == 5) {
+            if(strcmp(argv[3], "--time") == 0) {
+                runtime = strtol(argv[4], NULL, 10);
+            }
+        }
+        
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                      "Usage: %s [--primary | --backup] <redundancy Controller IP>",
