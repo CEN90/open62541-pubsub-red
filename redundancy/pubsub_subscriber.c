@@ -193,9 +193,9 @@ onPollLogValue(UA_Server *server, void *data) {
     UA_LOG_INFO(
         UA_Log_Stdout,
         UA_LOGCATEGORY_SERVER, 
-        "Value: %lld -> %lld sec, %lld ms, %lld us", 
+        "Value: %lld -> %lld ms, %lld us", 
         *(UA_Int64*)prevValue.data,
-        test.sec, test.milliSec, test.microSec
+        test.milliSec, test.microSec
     );
 }
 
@@ -226,8 +226,8 @@ onPollingEventSimple(UA_Server *server, void *data) {
                 UA_LOG_ERROR(
                     UA_Log_Stdout, 
                     UA_LOGCATEGORY_SERVER, 
-                    "Deadline not held -> %lld ms, %lld us", 
-                    test.sec, test.milliSec, test.microSec
+                    "S1: Deadline not held -> %lld ms, %lld us", 
+                    test.milliSec, test.microSec
                 );
             }
         } else {
