@@ -44,8 +44,8 @@ onFirstSyncState() {
                            retval);
         }
         
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                     "P(1.2): onFirstSyncState: PRIMARY -> start publishing %d \n", *isPrimary);
+        // UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+        //              "P(1.2): onFirstSyncState: PRIMARY -> start publishing %d \n", *isPrimary);
 
     } else {
         UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,

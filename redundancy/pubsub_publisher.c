@@ -24,6 +24,7 @@ static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
 
 typedef struct {
     UA_Boolean *isPrimary;
+    UA_Boolean *isFirstMsg;
     UA_Int64 *val;
 } cb_t;
 
@@ -171,8 +172,15 @@ updateFakeValue(UA_Server *server, void *data) {
 
         UA_Variant_setScalar(&value, cbData->val, &UA_TYPES[UA_TYPES_INT64]);
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "P(1.3): SensorValue: %d",
+        
+        if (*cbData->isFirstMsg) {
+            UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "P(1.3): SensorValue: %d",
                      *(cbData->val));
+            *cbData->isFirstMsg = false;
+        } else {
+            UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %d",
+                     *(cbData->val));
+        }
     }
 }
 
@@ -213,7 +221,8 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     addWriterGroup(server);
     addDataSetWriter(server);
 
-    cb_t callbackData = {isPrimary, &fakeValue};
+    UA_Boolean isFirstMsg = true; // For regex parsing in testing
+    cb_t callbackData = {isPrimary, &isFirstMsg, &fakeValue};
 
     UA_Server_addRepeatedCallback(server, updateFakeValue, &callbackData,
                                   PUBLISHER_PUBLISHINGINTERVAL, NULL);
@@ -223,10 +232,21 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, N,
                   kps);
 
-    UA_DateTime deadline = makeDeadline(runtime);
-        
+    if(!*isPrimary) {
+        UA_Server_disableWriterGroup(server, writerGroupIdent);
+    }
+    
+    // for testing
+    UA_DateTime deadline = makeDeadline(runtime); 
+    
     while(true) {
         syncState(N, kps);  // use retval later
+        
+        if(*isPrimary && isFirstMsg) {
+            UA_Server_enableWriterGroup(server, writerGroupIdent);
+            UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                         "P(1.2): Publisher is primary -> start publishing");
+        }
         
         if(*isPrimary) {
             UA_Server_run_iterate(server, true);
