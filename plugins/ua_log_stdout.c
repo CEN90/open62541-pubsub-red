@@ -83,8 +83,8 @@ UA_Log_Stdout_log(void *context, UA_LogLevel level, UA_LogCategory category,
     char logbuf[STDOUT_LOGBUFSIZE];
 
     /* Log */
-    printf("[%04u-%02u-%02u %02u:%02u:%02u.%03u (UTC%+05d)] %s/%s" ANSI_COLOR_RESET "\t",
-           dts.year, dts.month, dts.day, dts.hour, dts.min, dts.sec, dts.milliSec,
+    printf("[%04u-%02u-%02u %02u:%02u:%02u.%03u.%03u (UTC%+05d)] %s/%s" ANSI_COLOR_RESET "\t",
+           dts.year, dts.month, dts.day, dts.hour, dts.min, dts.sec, dts.milliSec, dts.microSec,
            (int)(tOffset / UA_DATETIME_SEC / 36), logLevelNames[logLevelSlot],
            logCategoryNames[category]);
     mp_vsnprintf(logbuf, STDOUT_LOGBUFSIZE, msg, args);
