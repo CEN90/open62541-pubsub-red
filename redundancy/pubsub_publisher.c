@@ -24,7 +24,7 @@ static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
 
 typedef struct {
     UA_Boolean *isPrimary;
-    UA_Boolean *isFirstMsg;
+    UA_Boolean *firstMsgLogged;
     UA_Int64 *val;
 } cb_t;
 
@@ -173,13 +173,14 @@ updateFakeValue(UA_Server *server, void *data) {
         UA_Variant_setScalar(&value, cbData->val, &UA_TYPES[UA_TYPES_INT64]);
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
         
-        if (*cbData->isFirstMsg) {
+        
+        if(!*(cbData->firstMsgLogged)) {
+            *(cbData->firstMsgLogged) = true;
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "B3: SensorValue: %d",
-                     *(cbData->val));
-            *cbData->isFirstMsg = false;
+                        *(cbData->val));
         } else {
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %d",
-                     *(cbData->val));
+                        *(cbData->val));
         }
     }
 }
@@ -222,7 +223,8 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     addDataSetWriter(server);
 
     UA_Boolean isFirstMsg = true; // For regex parsing in testing
-    cb_t callbackData = {isPrimary, &isFirstMsg, &fakeValue};
+    UA_Boolean firstMsgLogged = false;
+    cb_t callbackData = {isPrimary, &firstMsgLogged, &fakeValue};
 
     UA_Server_addRepeatedCallback(server, updateFakeValue, &callbackData,
                                   PUBLISHER_PUBLISHINGINTERVAL, NULL);
@@ -246,6 +248,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
             UA_Server_enableWriterGroup(server, writerGroupIdent);
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                          "B2: Publisher is primary -> start publishing");
+            isFirstMsg = false;
         }
         
         if(*isPrimary) {
