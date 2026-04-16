@@ -84,7 +84,7 @@ runHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean *isPrimary
             if(status == UA_STATUSCODE_BAD) {
                 *isPrimary = UA_TRUE;
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                             "P(1.1): Primary failed. Taking over.");
+                             "B1: Primary failed. Taking over.");
                 setupHeartbeatSender(ipAddress, port, sockfd);
             }
         }

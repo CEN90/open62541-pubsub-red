@@ -174,7 +174,7 @@ updateFakeValue(UA_Server *server, void *data) {
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
         
         if (*cbData->isFirstMsg) {
-            UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "P(1.3): SensorValue: %d",
+            UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "B3: SensorValue: %d",
                      *(cbData->val));
             *cbData->isFirstMsg = false;
         } else {
@@ -245,7 +245,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
         if(*isPrimary && isFirstMsg) {
             UA_Server_enableWriterGroup(server, writerGroupIdent);
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                         "P(1.2): Publisher is primary -> start publishing");
+                         "B2: Publisher is primary -> start publishing");
         }
         
         if(*isPrimary) {
