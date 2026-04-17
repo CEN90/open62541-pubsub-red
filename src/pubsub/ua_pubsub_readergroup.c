@@ -526,10 +526,7 @@ UA_ReaderGroup_decodeNetworkMessage(UA_PubSubManager *psm,
             rg->sequenceNumber = newSeq;
         }
     }
-    else {
-        printf("Netwrok message sequence number is not enabled");
-    }
-
+    
     /* Find a matching reader. Otherwise skip for this ReaderGroup */
     UA_DataSetReader *dsr;
     LIST_FOREACH(dsr, &rg->readers, listEntry) {
