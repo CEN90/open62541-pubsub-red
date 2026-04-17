@@ -24,11 +24,11 @@ UA_StatusCode
 onFirstSyncState() {
     if(*isPrimary) {
         UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(
-            server, writerGroupIdent, state.nmSequenceNr);
+            server, writerGroupIdent, state.nmSequenceNr + 1);
         if(retval == UA_STATUSCODE_GOOD) {
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                          "onFirstSyncState: WriterGroup sequence number set to %u",
-                         state.nmSequenceNr);
+                         state.nmSequenceNr + 1);
         } else {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "onFirstSyncState: Failed to set WriterGroup sequence number, "
@@ -36,7 +36,7 @@ onFirstSyncState() {
                            retval);
         }
         retval = UA_Server_setDataSetWriterSequenceNumber(server, dataSetWriterId,
-                                                      state.dswSequenceNr);
+                                                      state.dswSequenceNr + 1);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "onFirstSyncState: Failed to set DataSetWriter sequence number, "
