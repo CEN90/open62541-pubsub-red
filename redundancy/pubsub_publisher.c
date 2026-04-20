@@ -150,7 +150,8 @@ addDataSetWriter(UA_Server *server) {
     UA_UadpDataSetWriterMessageDataType_init(&dataSetWriterMessage);
 
     dataSetWriterMessage.dataSetMessageContentMask =
-        UA_UADPDATASETMESSAGECONTENTMASK_SEQUENCENUMBER;
+        UA_UADPDATASETMESSAGECONTENTMASK_SEQUENCENUMBER |
+        UA_UADPDATASETMESSAGECONTENTMASK_STATUS;
 
     UA_ExtensionObject_setValue(&dataSetWriterConfig.messageSettings,
                                 &dataSetWriterMessage,

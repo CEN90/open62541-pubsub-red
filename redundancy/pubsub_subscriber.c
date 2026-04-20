@@ -94,7 +94,8 @@ addDataSetReader(UA_Server *server) {
     UA_UadpDataSetReaderMessageDataType_init(&readerMessage);
 
     readerMessage.dataSetMessageContentMask =
-        UA_UADPDATASETMESSAGECONTENTMASK_SEQUENCENUMBER;
+        UA_UADPDATASETMESSAGECONTENTMASK_SEQUENCENUMBER | 
+        UA_UADPDATASETMESSAGECONTENTMASK_STATUS;
 
     UA_ExtensionObject_setValue(&readerConfig.messageSettings,
                                 &readerMessage,
@@ -175,16 +176,41 @@ addSubscribedVariables (UA_Server *server, UA_NodeId dataSetReaderId) {
 
 static void
 readFakeSensorValue(UA_Server *server, void *data) {
-    UA_Variant value;
-    UA_Variant_init(&value);
+    UA_ReadValueId item;
+    UA_ReadValueId_init(&item);
+    item.nodeId = UA_NODEID_STRING(1, "SensorValue");
+    item.attributeId = UA_ATTRIBUTEID_VALUE;
 
-    UA_Server_readValue(server, UA_NODEID_STRING(1, "SensorValue"), &value);
+    UA_DataValue dv = UA_Server_read(server, &item, UA_TIMESTAMPSTORETURN_NEITHER);
 
-    if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_INT64])) {
-        int64_t fakeValue = *(int64_t *)value.data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Value read: %lld", fakeValue);
+    if(dv.hasStatus) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                    "Status: 0x%08x", (unsigned)dv.status);
     }
+
+    if(dv.hasValue &&
+       UA_Variant_hasScalarType(&dv.value, &UA_TYPES[UA_TYPES_INT64])) {
+        UA_Int64 fakeValue = *(UA_Int64 *)dv.value.data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                    "Value read: %lld", (long long)fakeValue);
+    }
+
+    UA_DataValue_clear(&dv);
 }
+
+
+// static void
+// readFakeSensorValue(UA_Server *server, void *data) {
+//     UA_Variant value;
+//     UA_Variant_init(&value);
+
+//     UA_Server_readValue(server, UA_NODEID_STRING(1, "SensorValue"), &value);
+
+//     if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_INT64])) {
+//         int64_t fakeValue = *(int64_t *)value.data;
+//         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Value read: %lld", fakeValue);
+//     }
+// }
 
 static void
 onPollLogValue(UA_Server *server, void *data) {
