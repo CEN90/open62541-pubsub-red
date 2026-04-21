@@ -8,17 +8,18 @@
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
 
+#include <stddef.h>
 #include <stdio.h>
 
 #include "include/pubsub_redundancy.h"
 
-#define N 10
+#define NUMFIELDS 10
 #define FAKEVALUE 62541
 
 UA_Int16 runtime = 0;
 
 void
-runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary);
+runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields);
 
 static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
     dataSetWriterIdent;
@@ -228,7 +229,7 @@ deadlinePassed(UA_DateTime deadline) {
 }
 
 void
-runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
+runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields) {
     UA_Int64 fakeValue = FAKEVALUE;
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *config = UA_Server_getConfig(server);
@@ -238,29 +239,29 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
         UA_STRING("http://opcfoundation.org/UA-Profile/Transport/pubsub-udp-uadp");
     UA_NetworkAddressUrlDataType networkAddressUrl = {
         UA_STRING_NULL, UA_STRING("opc.udp://224.0.0.22:4842/")};
-
-    UA_Int64 *values = UA_Array_new(N, &UA_TYPES[UA_TYPES_INT64]);
-    initKeyValuePairs(values, N, &fakeValue);
+    
+    UA_Int64 *values = UA_Array_new(numFields, &UA_TYPES[UA_TYPES_INT64]);
+    initKeyValuePairs(values, numFields, &fakeValue);
 
     // common
     addPubSubConnection(server, &transportProfile, &networkAddressUrl);
 
     // publisher
     addPublishedDataSet(server);
-    addDataField(server, values, N);
+    addDataField(server, values, numFields);
     addWriterGroup(server);
     addDataSetWriter(server);
 
     UA_Boolean isFirstMsg = true;  // For regex parsing in testing
     UA_Boolean firstMsgLogged = false;
-    cb_t callbackData = {isPrimary, &firstMsgLogged, N, values};
+    cb_t callbackData = {isPrimary, &firstMsgLogged, numFields, values};
 
     UA_Server_addRepeatedCallback(server, updateFakeValue, &callbackData,
                                   PUBLISHER_PUBLISHINGINTERVAL, NULL);
 
     UA_Server_enableAllPubSubComponents(server);
 
-    initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, N,
+    initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, numFields,
                   values);
 
     if(!*isPrimary) {
@@ -271,7 +272,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     UA_DateTime deadline = makeDeadline(runtime);
 
     while(true) {
-        syncState(N, values);  // use retval later
+        syncState(numFields, values);  // use retval later
 
         if(*isPrimary && isFirstMsg) {
             UA_Server_enableWriterGroup(server, writerGroupIdent);
@@ -289,8 +290,8 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
         }
     }
 
-    clearKeyValuePairs(values, N);
-    UA_Array_delete(values, N, &UA_TYPES[UA_TYPES_INT64]);
+    clearKeyValuePairs(values, numFields);
+    UA_Array_delete(values, numFields, &UA_TYPES[UA_TYPES_INT64]);
 
     UA_Server_delete(server);
 }
@@ -300,6 +301,7 @@ main(int argc, char *argv[]) {
     const int port = 10001;
     UA_Boolean isPrimary = UA_FALSE;
     char redDcnIp[IPADDRLEN] = "127.0.0.1";
+    size_t numFields = NUMFIELDS;
 
     if(argc >= 3) {
         strcpy(redDcnIp, argv[2]);
@@ -314,9 +316,12 @@ main(int argc, char *argv[]) {
             return -1;
         }
 
-        if(argc == 5) {
+        if(argc == 7) {
             if(strcmp(argv[3], "--time") == 0) {
                 runtime = strtol(argv[4], NULL, 10);
+            }
+            if(strcmp(argv[5], "--numfields") == 0) {
+                numFields = strtol(argv[6], NULL, 10);
             }
         }
 
@@ -334,7 +339,7 @@ main(int argc, char *argv[]) {
         .isPrimary = &isPrimary,
     };
 
-    runPublisher(&config, &isPrimary);
+    runPublisher(&config, &isPrimary, numFields);
 
     return 0;
 }

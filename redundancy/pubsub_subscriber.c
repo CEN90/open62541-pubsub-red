@@ -16,7 +16,6 @@
 #define POLLINGINTERVAL 1
 #define DEADLINE UA_DATETIME_SEC
 
-#define N 10
 
 
 UA_Variant prevValue;
