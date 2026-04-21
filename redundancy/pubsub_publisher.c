@@ -204,11 +204,6 @@ updateFakeValue(UA_Server *server, void *data) {
 }
 
 
-UA_DateTime
-makeDeadline(UA_Int16 timeoutSeconds) {
-    return UA_DateTime_nowMonotonic() + (UA_DateTime)(timeoutSeconds * UA_DATETIME_SEC);
-}
-
 static void
 initKeyValuePairs(UA_Int64 *values, size_t numFields, const UA_Int64 *baseValue) {
     for(size_t i = 0; i < numFields; i++) {
@@ -223,10 +218,6 @@ clearKeyValuePairs(UA_Int64 *values, size_t numFields) {
     }
 }
 
-UA_Boolean
-deadlinePassed(UA_DateTime deadline) {
-    return UA_DateTime_nowMonotonic() > deadline;
-}
 
 void
 runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields) {
@@ -268,8 +259,6 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
         UA_Server_disableWriterGroup(server, writerGroupIdent);
     }
 
-    // for testing
-    UA_DateTime deadline = makeDeadline(runtime);
 
     while(true) {
         syncState(numFields, values);  // use retval later
@@ -283,10 +272,6 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
 
         if(*isPrimary) {
             UA_Server_run_iterate(server, true);
-        }
-
-        if(runtime > 0 && deadlinePassed(deadline)) {
-            break;
         }
     }
 
@@ -316,12 +301,9 @@ main(int argc, char *argv[]) {
             return -1;
         }
 
-        if(argc == 7) {
-            if(strcmp(argv[3], "--time") == 0) {
-                runtime = strtol(argv[4], NULL, 10);
-            }
-            if(strcmp(argv[5], "--numfields") == 0) {
-                numFields = strtol(argv[6], NULL, 10);
+        if(argc == 5) {
+            if(strcmp(argv[3], "--numfields") == 0) {
+                numFields = strtol(argv[4], NULL, 10);
             }
         }
 

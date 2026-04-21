@@ -184,8 +184,8 @@ onPollLogValue(UA_Server *server, void *data) {
     UA_LOG_INFO(
         UA_Log_Stdout,
         UA_LOGCATEGORY_SERVER, 
-        "Value: [%lld, %lld] -> %lld ms, %lld us", 
-        arr[0], arr[1],
+        "Value: %lld -> %lld ms, %lld us", 
+        arr[0],
         test.milliSec, test.microSec
     );
 }
