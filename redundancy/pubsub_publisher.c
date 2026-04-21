@@ -195,10 +195,10 @@ updateFakeValue(UA_Server *server, void *data) {
 
     if(!*(cbData->firstMsgLogged)) {
         *(cbData->firstMsgLogged) = true;
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "B3: SensorValue[0]: %lld",
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "B3: SensorValue: %lld",
                     (long long)cbData->values[0]);
     } else {
-        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue[0]: %lld",
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %lld",
                     (long long)cbData->values[0]);
     }
 }
