@@ -63,7 +63,6 @@ fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
     UA_DataSetMetaDataType_init (pMetaData);
     pMetaData->name = UA_STRING ("DataSet 2");
 
-    /* Now there is only 1 field (Int64) */
     pMetaData->fieldsSize = 1;
     pMetaData->fields = (UA_FieldMetaData*)UA_Array_new (pMetaData->fieldsSize,
                          &UA_TYPES[UA_TYPES_FIELDMETADATA]);
@@ -181,11 +180,13 @@ static void
 onPollLogValue(UA_Server *server, void *data) {
     UA_DateTimeStruct test = UA_DateTime_toStruct(prevTimeValChange);
     
+    UA_Int64 *arr = (UA_Int64 *)prevValue.data;
+    
     UA_LOG_INFO(
         UA_Log_Stdout,
         UA_LOGCATEGORY_SERVER, 
         "Value: %lld -> %lld ms, %lld us", 
-        *(UA_Int64*)prevValue.data,
+        arr[0],
         test.milliSec, test.microSec
     );
 }
@@ -195,38 +196,52 @@ onPollingEventSimple(UA_Server *server, void *data) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_StatusCode retval = UA_Server_readArrayDimensions(server, UA_NODEID_STRING(1, "SensorValue"), &value);
-
-    if(retval == UA_STATUSCODE_GOOD) {
-        UA_DateTime now = UA_DateTime_nowMonotonic();
-        
-        // No previous value, initialize only
-        if(prevTimeValChange == 0 || prevValue.type == NULL) {
-            prevTimeValChange = now;
-            prevValue = value;
-            return;
-        }
-        
-        UA_DateTime delta = now - prevTimeValChange;
-        
-        // Old value, check if time exceeded
-        if(*(UA_Int64*) value.data == *(UA_Int64*) prevValue.data) {
-            if(delta > DEADLINE) {
-                prevTimeValChange = now;
-                UA_DateTimeStruct test = UA_DateTime_toStruct(delta);
-                UA_LOG_ERROR(
-                    UA_Log_Stdout, 
-                    UA_LOGCATEGORY_SERVER, 
-                    "S1: Deadline not held -> %lld ms, %lld us", 
-                    test.milliSec, test.microSec
-                );
-            }
-        } else {
-            // New value, update timestamp and value
-            prevValue = value;
-            prevTimeValChange = now;
-        }        
+    UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "SensorValue"), &value);
+    if(retval != UA_STATUSCODE_GOOD)
+        return;
+    
+    if(value.type != &UA_TYPES[UA_TYPES_INT64] || !UA_Variant_isArray(&value) ||
+        value.data == NULL) {
+        UA_Variant_clear(&value);
+        return;
     }
+    
+    UA_DateTime now = UA_DateTime_nowMonotonic();
+    
+    // No previous value, initialize only
+    if(prevTimeValChange == 0 || prevValue.type == NULL || prevValue.data == NULL) {
+        prevTimeValChange = now;
+        UA_Variant_copy(&value, &prevValue);
+        UA_Variant_clear(&value);
+        return;
+    }
+    
+    UA_Boolean same = UA_FALSE;
+    same = (memcmp(value.data, prevValue.data,
+                        value.arrayLength * sizeof(UA_Int64)) == 0);   
+
+    UA_DateTime delta = now - prevTimeValChange;
+    
+    // Old value, check if time exceeded
+    if(same) {
+        if(delta > DEADLINE) {
+            prevTimeValChange = now;
+            UA_DateTimeStruct test = UA_DateTime_toStruct(delta);
+            UA_LOG_ERROR(
+                UA_Log_Stdout, 
+                UA_LOGCATEGORY_SERVER, 
+                "S1: Deadline not held -> %lld ms, %lld us", 
+                test.milliSec, test.microSec
+            );
+        }
+    } else {
+        // New value, update timestamp and value
+        UA_Variant_clear(&prevValue);
+        UA_Variant_copy(&value, &prevValue);
+        prevTimeValChange = now;
+    }      
+    
+    UA_Variant_clear(&value);
 }
 
 
@@ -267,6 +282,7 @@ main(int argc, char *argv[]) {
     UA_Server_enableAllPubSubComponents(server);
     UA_Server_runUntilInterrupt(server);
 
+    UA_Variant_clear(&prevValue);
     UA_Server_delete(server);
     return 0;
 }
