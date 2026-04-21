@@ -8,13 +8,14 @@
 #include "open62541/plugin/log.h"
 #include "open62541/types.h"
 
+#include <stdio.h>
+
 #include "include/pubsub_redundancy.h"
 
-#define N 1
+#define N 10
 #define FAKEVALUE 62541
 
 UA_Int16 runtime = 0;
-
 
 void
 runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary);
@@ -25,7 +26,8 @@ static UA_NodeId connectionIdentifier, publishedDataSetIdent, writerGroupIdent,
 typedef struct {
     UA_Boolean *isPrimary;
     UA_Boolean *firstMsgLogged;
-    UA_Int64 *val;
+    size_t numFields;
+    UA_Int64 *values;
 } cb_t;
 
 static void
@@ -65,15 +67,18 @@ addPublishedDataSet(UA_Server *server) {
 }
 
 static UA_NodeId
-addStateVariable(UA_Server *server, UA_Int64 *fakeValue) {
+addStateVariable(UA_Server *server, UA_Int64 *values, size_t numFields) {
     UA_VariableAttributes attr = UA_VariableAttributes_default;
     attr.displayName = UA_LOCALIZEDTEXT("en-US", "SensorValue");
     attr.dataType = UA_TYPES[UA_TYPES_INT64].typeId;
-    attr.valueRank = -1;
-    UA_Variant value;
-
-    UA_Variant_setScalar(&value, fakeValue, &UA_TYPES[UA_TYPES_INT64]);
-    attr.value = value;
+    attr.valueRank = UA_VALUERANK_ONE_DIMENSION;
+    
+    UA_UInt32 dims[1] = {(UA_UInt32)numFields};
+    attr.arrayDimensions = dims;
+    attr.arrayDimensionsSize = UA_VALUERANK_ONE_DIMENSION;
+    
+    UA_Variant_init(&attr.value);
+    UA_Variant_setArrayCopy(&attr.value, values, numFields, &UA_TYPES[UA_TYPES_INT64]);
 
     UA_NodeId stateNodeId = UA_NODEID_STRING(1, "SensorValue");
     UA_Server_addVariableNode(
@@ -81,13 +86,11 @@ addStateVariable(UA_Server *server, UA_Int64 *fakeValue) {
         UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES), UA_QUALIFIEDNAME(1, "SensorValue"),
         UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), attr, NULL, NULL);
 
-    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Value %d",
-                 *(int64_t *)value.data);
     return stateNodeId;
 }
 
 static void
-addDataField(UA_Server *server, UA_Int64 *fakeValue) {
+addDataField(UA_Server *server, UA_Int64 *values, size_t numFields) {
     UA_NodeId dataSetFieldIdent;
     UA_DataSetFieldConfig dataSetFieldConfig;
     memset(&dataSetFieldConfig, 0, sizeof(UA_DataSetFieldConfig));
@@ -95,7 +98,7 @@ addDataField(UA_Server *server, UA_Int64 *fakeValue) {
     dataSetFieldConfig.field.variable.fieldNameAlias = UA_STRING("SensorValue");
     dataSetFieldConfig.field.variable.promotedField = UA_FALSE;
     dataSetFieldConfig.field.variable.publishParameters.publishedVariable =
-        addStateVariable(server, fakeValue);
+        addStateVariable(server, values, numFields);
     dataSetFieldConfig.field.variable.publishParameters.attributeId =
         UA_ATTRIBUTEID_VALUE;
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldConfig,
@@ -165,31 +168,58 @@ static void
 updateFakeValue(UA_Server *server, void *data) {
     cb_t *cbData = (cb_t *)data;
 
-    if(*cbData->isPrimary) {
-        *(cbData->val) += 1;
+    if(!*cbData->isPrimary)
+        return;
 
-        UA_Variant value;
-        UA_Variant_init(&value);
+    /* Update all fields in-place */
+    for(size_t i = 0; i < cbData->numFields; i++) {
+        cbData->values[i] += 1;
+    }
 
-        UA_Variant_setScalar(&value, cbData->val, &UA_TYPES[UA_TYPES_INT64]);
+    /* Write updated Int64[] to SensorValue */
+    UA_Variant value;
+    UA_Variant_init(&value);
+    UA_Variant_setArray(&value, cbData->values, cbData->numFields,
+                        &UA_TYPES[UA_TYPES_INT64]);
+
+    UA_StatusCode ret =
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "SensorValue"), value);
-        
-        
-        if(!*(cbData->firstMsgLogged)) {
-            *(cbData->firstMsgLogged) = true;
-            UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "B3: SensorValue: %d",
-                        *(cbData->val));
-        } else {
-            UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %d",
-                        *(cbData->val));
-        }
+
+    if(ret != UA_STATUSCODE_GOOD) {
+        UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                       "Failed to write SensorValue array. StatusCode: 0x%08x",
+                       (unsigned int)ret);
+        return;
+    }
+
+    if(!*(cbData->firstMsgLogged)) {
+        *(cbData->firstMsgLogged) = true;
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "B3: SensorValue[0]: %lld",
+                    (long long)cbData->values[0]);
+    } else {
+        UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue[0]: %lld",
+                    (long long)cbData->values[0]);
     }
 }
 
+
 UA_DateTime
 makeDeadline(UA_Int16 timeoutSeconds) {
-    return UA_DateTime_nowMonotonic()
-         + (UA_DateTime)(timeoutSeconds * UA_DATETIME_SEC);
+    return UA_DateTime_nowMonotonic() + (UA_DateTime)(timeoutSeconds * UA_DATETIME_SEC);
+}
+
+static void
+initKeyValuePairs(UA_Int64 *values, size_t numFields, const UA_Int64 *baseValue) {
+    for(size_t i = 0; i < numFields; i++) {
+        values[i] = *baseValue + (UA_Int64)i;
+    }
+}
+
+static void
+clearKeyValuePairs(UA_Int64 *values, size_t numFields) {
+    for(size_t i = 0; i < numFields; i++) {
+        values[i] = 0;
+    }
 }
 
 UA_Boolean
@@ -209,23 +239,21 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     UA_NetworkAddressUrlDataType networkAddressUrl = {
         UA_STRING_NULL, UA_STRING("opc.udp://224.0.0.22:4842/")};
 
-    UA_KeyValuePair *kps = UA_Array_new(N, &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
-
-    kps[0].key = UA_QUALIFIEDNAME(1, "FakeNews");
-    UA_Variant_setScalar(&kps[0].value, &fakeValue, &UA_TYPES[UA_TYPES_INT64]);
+    UA_Int64 *values = UA_Array_new(N, &UA_TYPES[UA_TYPES_INT64]);
+    initKeyValuePairs(values, N, &fakeValue);
 
     // common
     addPubSubConnection(server, &transportProfile, &networkAddressUrl);
 
     // publisher
     addPublishedDataSet(server);
-    addDataField(server, &fakeValue);
+    addDataField(server, values, N);
     addWriterGroup(server);
     addDataSetWriter(server);
 
-    UA_Boolean isFirstMsg = true; // For regex parsing in testing
+    UA_Boolean isFirstMsg = true;  // For regex parsing in testing
     UA_Boolean firstMsgLogged = false;
-    cb_t callbackData = {isPrimary, &firstMsgLogged, &fakeValue};
+    cb_t callbackData = {isPrimary, &firstMsgLogged, N, values};
 
     UA_Server_addRepeatedCallback(server, updateFakeValue, &callbackData,
                                   PUBLISHER_PUBLISHINGINTERVAL, NULL);
@@ -233,33 +261,36 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary) {
     UA_Server_enableAllPubSubComponents(server);
 
     initStateSync(isPrimary, server, hb_config, writerGroupIdent, dataSetWriterIdent, N,
-                  kps);
+                  values);
 
     if(!*isPrimary) {
         UA_Server_disableWriterGroup(server, writerGroupIdent);
     }
-    
+
     // for testing
-    UA_DateTime deadline = makeDeadline(runtime); 
-    
+    UA_DateTime deadline = makeDeadline(runtime);
+
     while(true) {
-        syncState(N, kps);  // use retval later
-        
+        syncState(N, values);  // use retval later
+
         if(*isPrimary && isFirstMsg) {
             UA_Server_enableWriterGroup(server, writerGroupIdent);
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                          "B2: Publisher is primary -> start publishing");
             isFirstMsg = false;
         }
-        
+
         if(*isPrimary) {
             UA_Server_run_iterate(server, true);
         }
-        
+
         if(runtime > 0 && deadlinePassed(deadline)) {
             break;
         }
     }
+
+    clearKeyValuePairs(values, N);
+    UA_Array_delete(values, N, &UA_TYPES[UA_TYPES_INT64]);
 
     UA_Server_delete(server);
 }
@@ -282,13 +313,13 @@ main(int argc, char *argv[]) {
                          argv[1]);
             return -1;
         }
-        
-        if (argc == 5) {
+
+        if(argc == 5) {
             if(strcmp(argv[3], "--time") == 0) {
                 runtime = strtol(argv[4], NULL, 10);
             }
         }
-        
+
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                      "Usage: %s [--primary | --backup] <redundancy Controller IP>",

@@ -1,5 +1,6 @@
 #include "open62541/types.h"
 
+#include <open62541/common.h>
 #include <open62541/plugin/log_stdout.h>
 #include <open62541/server.h>
 #include <open62541/server_pubsub.h>
@@ -14,6 +15,8 @@
 
 #define POLLINGINTERVAL 1
 #define DEADLINE UA_DATETIME_SEC
+
+#define N 10
 
 
 UA_Variant prevValue;
@@ -71,7 +74,7 @@ fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
                    &pMetaData->fields[0].dataType);
     pMetaData->fields[0].builtInType = UA_NS0ID_INT64;
     pMetaData->fields[0].name =  UA_STRING ("SensorValue");
-    pMetaData->fields[0].valueRank = -1; /* scalar */
+    pMetaData->fields[0].valueRank = UA_VALUERANK_ONE_DIMENSION; 
 }
 
 static void
@@ -192,7 +195,7 @@ onPollingEventSimple(UA_Server *server, void *data) {
     UA_Variant value;
     UA_Variant_init(&value);
 
-    UA_StatusCode retval = UA_Server_readValue(server, UA_NODEID_STRING(1, "SensorValue"), &value);
+    UA_StatusCode retval = UA_Server_readArrayDimensions(server, UA_NODEID_STRING(1, "SensorValue"), &value);
 
     if(retval == UA_STATUSCODE_GOOD) {
         UA_DateTime now = UA_DateTime_nowMonotonic();

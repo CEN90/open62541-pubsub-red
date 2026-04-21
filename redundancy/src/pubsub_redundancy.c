@@ -58,7 +58,7 @@ onFirstSyncState() {
 }
 
 UA_StatusCode
-syncState(UA_UInt32 appStateSize, UA_KeyValuePair *applicationStates) {
+syncState(UA_UInt32 appStateSize, const UA_Int64 *applicationStates) {
     if(*isPrimary != lastState) {
         onFirstSyncState();
     }
@@ -92,6 +92,14 @@ syncState(UA_UInt32 appStateSize, UA_KeyValuePair *applicationStates) {
                            "StatusCode: 0x%08x",
                            retval);
         }
+        
+        UA_StatusCode retv = UA_Array_copy(applicationStates, appStateSize, (void *)&(state.applicationStates), &UA_TYPES[UA_TYPES_INT64]);
+        if(retv != UA_STATUSCODE_GOOD) {
+            UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                           "syncState: Failed to copy applicationStates, "
+                           "StatusCode: 0x%08x",
+                           retv);
+        }
     }
 
     return UA_STATUSCODE_GOOD;
@@ -114,9 +122,8 @@ initSyncThreads(void *arg) {
     state.dswSequenceNr = 0;
     state.applicationStatesSize = args.appStateSize;
     
-    state.applicationStates = UA_Array_new(args.appStateSize, &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
-    UA_StatusCode retv = UA_Array_copy(args.applicationStates, args.appStateSize, (void *)&(state.applicationStates), &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
-    // state.applicationStates = args.applicationStates;
+    state.applicationStates = UA_Array_new(args.appStateSize, &UA_TYPES[UA_TYPES_INT64]);
+    UA_StatusCode retv = UA_Array_copy(args.applicationStates, args.appStateSize, (void *)&(state.applicationStates), &UA_TYPES[UA_TYPES_INT64]);
 
     cbstruct_s stateStruct = {
         .data = &state,
@@ -145,7 +152,7 @@ UA_StatusCode
 initStateSync(UA_Boolean *isPrimary, UA_Server *_server, 
             HeartbeatConfig *config, UA_NodeId writerGroupIdent, 
             UA_NodeId dataSetWriterId, UA_UInt32 appStateSize, 
-            UA_KeyValuePair *applicationStates) {
+            UA_Int64 *applicationStates) {
     syncThreadArgs_s args = {
         .isPrimary = isPrimary,
         .server = _server,

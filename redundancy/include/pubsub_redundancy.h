@@ -25,7 +25,7 @@ typedef struct {
     UA_NodeId writerGroupIdent;
     UA_NodeId dataSetWriterId;
     UA_UInt32 appStateSize;
-    UA_KeyValuePair *applicationStates;
+    UA_Int64 *applicationStates;
 } syncThreadArgs_s;
 
 static UA_Boolean *isPrimary;
@@ -33,7 +33,7 @@ static UA_Server *server;
 static UA_NodeId writerGroupIdent, dataSetWriterId;
 
 UA_StatusCode
-syncState(UA_UInt32 appStateSize, UA_KeyValuePair *applicationStates);
+syncState(UA_UInt32 appStateSize, const UA_Int64 *applicationStates);
 
 static void *
 initSyncThreads(void *arg);
@@ -42,6 +42,6 @@ UA_StatusCode
 initStateSync(UA_Boolean *isPrimary, UA_Server *_server,
             HeartbeatConfig *config, UA_NodeId writerGroupIdent,
             UA_NodeId dataSetWriterId, UA_UInt32 appStateSize,
-            UA_KeyValuePair *applicationStates);
+            UA_Int64 *applicationStates);
 
 #endif

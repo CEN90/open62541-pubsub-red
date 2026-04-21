@@ -46,7 +46,7 @@ UA_StatusCode registerRedundancyStateType(UA_Server *server) {
     structDef.fields[1].valueRank = UA_VALUERANK_SCALAR;
 
     structDef.fields[2].name      = UA_STRING("applicationStates");
-    structDef.fields[2].dataType  = UA_TYPES[UA_TYPES_KEYVALUEPAIR].typeId;
+    structDef.fields[2].dataType  = UA_TYPES[UA_TYPES_INT64].typeId;
     structDef.fields[2].valueRank = UA_VALUERANK_ONE_DIMENSION;
 
     UA_StructureDescription sd;

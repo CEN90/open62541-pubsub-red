@@ -9,7 +9,7 @@ typedef struct {
     UA_Int16 dswSequenceNr;
 
     size_t applicationStatesSize;
-    UA_KeyValuePair *applicationStates;
+    UA_Int64 *applicationStates;
 } RedundancyState_s;
 
 UA_StatusCode registerRedundancyStateType(UA_Server *server);
