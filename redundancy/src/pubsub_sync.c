@@ -385,7 +385,7 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
         if(stateStruct->applicationStates && stateStruct->applicationStatesSize > 0) {
             UA_Array_delete(stateStruct->applicationStates,
                             stateStruct->applicationStatesSize,
-                            &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+                            &UA_TYPES[UA_TYPES_INT64]);
             stateStruct->applicationStates = NULL;
             stateStruct->applicationStatesSize = 0;
         }
@@ -396,7 +396,7 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
                 remoteState->applicationStates,
                 remoteState->applicationStatesSize,
                 (void**)&stateStruct->applicationStates,
-                &UA_TYPES[UA_TYPES_KEYVALUEPAIR]);
+                &UA_TYPES[UA_TYPES_INT64]);
             if(rc == UA_STATUSCODE_GOOD)
                 stateStruct->applicationStatesSize = remoteState->applicationStatesSize;
             else
