@@ -313,6 +313,9 @@ main(int argc, char *argv[]) {
                      argv[0]);
         return -1;
     }
+    
+    UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
+                 "numFields = %llu", (long long)numFields);
 
     HeartbeatConfig config = {
         .port = &port,
