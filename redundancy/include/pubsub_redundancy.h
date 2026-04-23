@@ -33,7 +33,7 @@ static UA_Server *server;
 static UA_NodeId writerGroupIdent, dataSetWriterId;
 
 UA_StatusCode
-syncState(UA_UInt32 appStateSize, const UA_Int64 *applicationStates);
+syncState(UA_UInt32 appStateSize, UA_Int64 **applicationStates);
 
 static void *
 initSyncThreads(void *arg);

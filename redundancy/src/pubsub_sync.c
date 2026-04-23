@@ -381,15 +381,6 @@ readSyncState(UA_Server *server, RedundancyState_s *stateStruct) {
         stateStruct->nmSequenceNr  = remoteState->nmSequenceNr;
         stateStruct->dswSequenceNr = remoteState->dswSequenceNr;
 
-        /* Free old array if present */
-        if(stateStruct->applicationStates && stateStruct->applicationStatesSize > 0) {
-            UA_Array_delete(stateStruct->applicationStates,
-                            stateStruct->applicationStatesSize,
-                            &UA_TYPES[UA_TYPES_INT64]);
-            stateStruct->applicationStates = NULL;
-            stateStruct->applicationStatesSize = 0;
-        }
-
         if(remoteState->applicationStatesSize > 0) {
             /* Deep copy the UA_String array */
             UA_StatusCode rc = UA_Array_copy(

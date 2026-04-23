@@ -28,7 +28,7 @@ typedef struct {
     UA_Boolean *isPrimary;
     UA_Boolean *firstMsgLogged;
     size_t numFields;
-    UA_Int64 *values;
+    UA_Int64 **values;
 } cb_t;
 
 static void
@@ -168,19 +168,20 @@ addDataSetWriter(UA_Server *server) {
 static void
 updateFakeValue(UA_Server *server, void *data) {
     cb_t *cbData = (cb_t *)data;
-
-    if(!*cbData->isPrimary)
+    
+    if(!(*cbData->isPrimary)) {
         return;
+    }
 
     /* Update all fields in-place */
     for(size_t i = 0; i < cbData->numFields; i++) {
-        cbData->values[i] += 1;
+        (*cbData->values)[i] += 1;
     }
 
     /* Write updated Int64[] to SensorValue */
     UA_Variant value;
     UA_Variant_init(&value);
-    UA_Variant_setArray(&value, cbData->values, cbData->numFields,
+    UA_Variant_setArrayCopy(&value, *cbData->values, cbData->numFields,
                         &UA_TYPES[UA_TYPES_INT64]);
 
     UA_StatusCode ret =
@@ -196,18 +197,17 @@ updateFakeValue(UA_Server *server, void *data) {
     if(!*(cbData->firstMsgLogged)) {
         *(cbData->firstMsgLogged) = true;
         UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "B3: SensorValue: %lld",
-                    (long long)cbData->values[0]);
+                    (long long)*cbData->values[0]);
     } else {
         UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %lld",
-                    (long long)cbData->values[0]);
+                    (long long)*cbData->values[0]);
     }
 }
 
-
 static void
-initKeyValuePairs(UA_Int64 *values, size_t numFields, const UA_Int64 *baseValue) {
+initKeyValuePairs(UA_Int64 *values, size_t numFields, const UA_Int64 baseValue) {
     for(size_t i = 0; i < numFields; i++) {
-        values[i] = *baseValue + (UA_Int64)i;
+        values[i] = baseValue + (UA_Int64)i;
     }
 }
 
@@ -218,10 +218,8 @@ clearKeyValuePairs(UA_Int64 *values, size_t numFields) {
     }
 }
 
-
 void
 runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields) {
-    UA_Int64 fakeValue = FAKEVALUE;
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *config = UA_Server_getConfig(server);
     UA_ServerConfig_setDefault(config);
@@ -232,7 +230,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
         UA_STRING_NULL, UA_STRING("opc.udp://224.0.0.22:4842/")};
     
     UA_Int64 *values = UA_Array_new(numFields, &UA_TYPES[UA_TYPES_INT64]);
-    initKeyValuePairs(values, numFields, &fakeValue);
+    initKeyValuePairs(values, numFields, FAKEVALUE);
 
     // common
     addPubSubConnection(server, &transportProfile, &networkAddressUrl);
@@ -245,7 +243,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
 
     UA_Boolean isFirstMsg = true;  // For regex parsing in testing
     UA_Boolean firstMsgLogged = false;
-    cb_t callbackData = {isPrimary, &firstMsgLogged, numFields, values};
+    cb_t callbackData = {isPrimary, &firstMsgLogged, numFields, &values};
 
     UA_Server_addRepeatedCallback(server, updateFakeValue, &callbackData,
                                   PUBLISHER_PUBLISHINGINTERVAL, NULL);
@@ -259,10 +257,11 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
         UA_Server_disableWriterGroup(server, writerGroupIdent);
     }
 
+    sleep(2);
 
     while(true) {
-        syncState(numFields, values);  // use retval later
-
+        syncState(numFields, &values);  // use retval later
+        
         if(*isPrimary && isFirstMsg) {
             UA_Server_enableWriterGroup(server, writerGroupIdent);
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
