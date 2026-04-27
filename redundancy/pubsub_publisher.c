@@ -269,9 +269,7 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
             isFirstMsg = false;
         }
 
-        // if(*isPrimary) {
-            UA_Server_run_iterate(server, true);
-        // }
+        UA_Server_run_iterate(server, true);
     }
 
     clearKeyValuePairs(values, numFields);
