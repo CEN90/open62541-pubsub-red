@@ -23,16 +23,13 @@ onFirstSyncState() {
     if(*isPrimary) {
         UA_StatusCode retval = UA_Server_setWriterGroupSequenceNumber(
             server, writerGroupIdent, state.nmSequenceNr + 1);
-        if(retval == UA_STATUSCODE_GOOD) {
-            UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-                         "onFirstSyncState: WriterGroup sequence number set to %u",
-                         state.nmSequenceNr + 1);
-        } else {
+        if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "onFirstSyncState: Failed to set WriterGroup sequence number, "
                            "StatusCode: 0x%08x",
                            retval);
         }
+        
         retval = UA_Server_setDataSetWriterSequenceNumber(server, dataSetWriterId,
                                                           state.dswSequenceNr + 1);
         if(retval != UA_STATUSCODE_GOOD) {
@@ -42,11 +39,6 @@ onFirstSyncState() {
                 "StatusCode: 0x%08x",
                 retval);
         }
-
-        // UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-        //              "P(1.2): onFirstSyncState: PRIMARY -> start publishing %d \n",
-        //              *isPrimary);
-
     } else {
         UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                        "onFirstSyncState: BACKUP -> Not publishing");
@@ -72,8 +64,6 @@ syncState(UA_UInt32 appStateSize, UA_Int64 **applicationStates) {
 
         if(retval == UA_STATUSCODE_GOOD) {
             state.nmSequenceNr = wgSeq;
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-            //             "syncState: writerGroupSequenceNr: %u", wgSeq);
         } else {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "syncState: Failed to get sequence number, StatusCode: 0x%08x",
@@ -85,8 +75,6 @@ syncState(UA_UInt32 appStateSize, UA_Int64 **applicationStates) {
 
         if(retval == UA_STATUSCODE_GOOD) {
             state.dswSequenceNr = nmSeq;
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
-            //             "syncState: dataSetWriterSequenceNr: %u", nmSeq);
         } else {
             UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                            "syncState: Failed to get DataSetWriter seq nr, "

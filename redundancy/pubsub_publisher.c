@@ -16,7 +16,7 @@
 
 #define NUMFIELDS 10
 #define FAKEVALUE 62541
-#define LOOPSLEEPUS 10000
+#define LOOPSLEEPUS 25000
 
 UA_Int16 runtime = 0;
 UA_Boolean dirty_vars = UA_TRUE;

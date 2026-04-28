@@ -14,7 +14,7 @@
 #define WRITERGROUDID 100
 #define DATASETWRITERID 62541
 
-#define PUBLISHINGINTERVAL 50
+#define PUBLISHINGINTERVAL 40
 #define KEYFRAMECOUNT 10
 
 // struct with Struct_s and isPrimary
