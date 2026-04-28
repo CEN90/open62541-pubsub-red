@@ -10,11 +10,13 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "include/pubsub_redundancy.h"
 
 #define NUMFIELDS 10
 #define FAKEVALUE 62541
+#define LOOPSLEEPUS 10000
 
 UA_Int16 runtime = 0;
 UA_Boolean dirty_vars = UA_TRUE;
@@ -275,7 +277,8 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
             isFirstMsg = false;
         }
 
-        UA_Server_run_iterate(server, true);
+        UA_Server_run_iterate(server, false);
+        usleep(LOOPSLEEPUS);
     }
 
     clearKeyValuePairs(values, numFields);
