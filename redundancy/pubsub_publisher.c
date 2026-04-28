@@ -16,7 +16,7 @@
 
 #define NUMFIELDS 10
 #define FAKEVALUE 62541
-#define LOOPSLEEPUS 25000
+#define LOOPSLEEPUS 1000
 
 UA_Int16 runtime = 0;
 
