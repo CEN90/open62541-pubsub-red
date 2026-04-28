@@ -17,6 +17,7 @@
 #define FAKEVALUE 62541
 
 UA_Int16 runtime = 0;
+UA_Boolean dirty_vars = UA_TRUE;
 
 void
 runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields);
@@ -202,6 +203,8 @@ updateFakeValue(UA_Server *server, void *data) {
         UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SensorValue: %lld",
                     (long long)*cbData->values[0]);
     }
+
+    dirty_vars = UA_TRUE;
 }
 
 static void
@@ -260,8 +263,11 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
     sleep(2);
 
     while(true) {
-        syncState(numFields, &values);  // use retval later
-        
+        if(dirty_vars) {
+            syncState(numFields, &values);  // use retval later
+            dirty_vars = UA_FALSE;
+        }
+
         if(*isPrimary && isFirstMsg) {
             UA_Server_enableWriterGroup(server, writerGroupIdent);
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
