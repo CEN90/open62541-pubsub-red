@@ -75,21 +75,18 @@ runHeartbeat(const char *ipAddress, int port, int *sockfd, UA_Boolean *isPrimary
     while(1) {
         if(*isPrimary) {
             sendHeartbeat(sockfd);
-        } else {
-            UA_StatusCode status = receiveHeartbeat(*sockfd, isPrimary, &prevHbTime);
+            usleep((__useconds_t)HEARTBEATPERIOD);
+            continue;
+        } 
+        
+        UA_StatusCode status = receiveHeartbeat(*sockfd, isPrimary, &prevHbTime);
 
-            // if(status == UA_STATUSCODE_GOOD) {
-            //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Primary alive.");
-            // } else {
-            if(status == UA_STATUSCODE_BAD) {
-                *isPrimary = UA_TRUE;
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                             "B1: Primary failed. Taking over.");
-                setupHeartbeatSender(ipAddress, port, sockfd);
-            }
+        if(status == UA_STATUSCODE_BAD) {
+            *isPrimary = UA_TRUE;
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                            "B1: Primary failed. Taking over.");
+            setupHeartbeatSender(ipAddress, port, sockfd);
         }
-
-        usleep((__useconds_t)HEARTBEATPERIOD);
     }
 }
 
@@ -153,9 +150,9 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
     int nfds =
         epoll_wait(epoll_fd, events, 1, HEARTBEATSLACK);  // 0 ms timeout for non-blocking
 
-    // if(nfds <= 0) {
-    //     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No heartbeat received");
-    // }
+    if(nfds <= 0) {
+        return UA_STATUSCODE_BAD;
+    }
 
     if(events[0].events & EPOLLIN) {
         UA_DateTime newest = 0;
@@ -179,15 +176,6 @@ receiveHeartbeat(int sockfd, UA_Boolean *isPrimary, UA_DateTime *prevHbTime) {
 
         if(newest != 0) {
             *prevHbTime = newest;  // update once per epoll wakeup
-            
-            // if(*prevHbTime != 0) {
-            //     // UA_Int64 diff_ms = (newest - *prevHbTime) / UA_DATETIME_MSEC;
-            //     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-            //     //             "Heartbeat received after %lld ms", diff_ms);
-            // } else {
-            //     UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-            //                  "First heartbeat received");
-            // }
         }
     }
 
