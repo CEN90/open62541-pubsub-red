@@ -262,9 +262,8 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
     sleep(2);
 
     while(true) {
-        syncState(numFields, &values);  // use retval later
-
         if(*isPrimary && isFirstMsg) {
+            syncState(numFields, &values);  
             UA_Server_enableWriterGroup(server, writerGroupIdent);
             UA_LOG_DEBUG(UA_Log_Stdout, UA_LOGCATEGORY_APPLICATION,
                          "B2: Publisher is primary -> start publishing");
@@ -272,6 +271,8 @@ runPublisher(HeartbeatConfig *hb_config, UA_Boolean *isPrimary, size_t numFields
         }
 
         UA_Server_run_iterate(server, false);
+        syncState(numFields, &values); 
+
         usleep(LOOPSLEEPUS);
     }
 
